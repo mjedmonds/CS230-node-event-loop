@@ -1,1 +1,3 @@
-# CS230-node-event-loop
+# Sequential tracing of Node.js callbacks
+
+This is our CS 230 - Software Engineering project.
