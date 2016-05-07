@@ -2,16 +2,13 @@ var fs = require('fs');
 var esprima = require('esprima');
 var walkAST = require('esprima-walk');
 
-var emitNodes = [];
-var emitNodeCallingFunctions = [];
-var emitEvents = [];
 var emits = [];
 var unknownCount = 0;
 
-function Emit(event, caller){
-  this.event = event;
-  this.caller = caller;
-  this.callbacks = [];
+// Emit class, represents and emit and a corresponding caller
+function Emit(event, caller) {
+  this.event = event;     // event being triggered
+  this.caller = caller;   // fucntion triggering event
 }
 
 function hasOwnProperty(obj, prop) {
@@ -21,14 +18,16 @@ function hasOwnProperty(obj, prop) {
 }
 
 // finds an the event emitting by an emit() node in the AST
-function find_emit_event(parent){
-  if(parent.type == "CallExpression"){
+function find_emit_event(parent) {
+  if (parent.type == "CallExpression") {
+    //console.log("found event: " + parent.arguments[0].value);
     return parent.arguments[0].value;
   } else {
     return find_emit_event(parent.parent);
   }
 }
 
+// collects emitting node information (event and caller)
 function collect_emitting_nodes(node) {
   //types.push(node.type)
   //nodesWithTypes.push(node)
@@ -38,15 +37,15 @@ function collect_emitting_nodes(node) {
 }
 
 // finds the function name of a calling function
-function find_function_name(parent){
-  if(parent == null){
-    //console.log("pushing function name: anon" + unknownCount);
+function find_function_name(parent) {
+  if (parent == null) {
+    //console.log("found function name: anon" + unknownCount);
     return "anon" + unknownCount++;
-  } else if(parent.id == null) {
+  } else if (parent.id == null) {
     //  console.log("found null parent.id, parent.type: " + parent.type);
-    find_function_name(parent.parent);
+    return find_function_name(parent.parent);
   } else {
-    // console.log("pushing function name: " + parent.id.name)
+    //console.log("found function name: " + parent.id.name)
     return parent.id.name;
   }
 }
@@ -54,20 +53,20 @@ function find_function_name(parent){
 // finds the calling function of this AST node
 function find_calling_function(node) {
   var parent = node.parent;
-  // if(node.type == "Program"){
-  //   console.log("At program");
-  // }
-  if(parent.hasOwnProperty("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression")){
+
+  if (parent.hasOwnProperty("type")
+    && (parent.type == "FunctionExpression"
+    || parent.type == "FunctionDeclaration"
+    || parent.type == "ArrowFunctionExpression")) {
     //console.log("found function for emit");
     return find_function_name(parent);
-  }
-  else{
+  } else {
     return find_calling_function(parent);
   }
 }
 
-function print_emits(){
-  for(i = 0; i < emits.length; i++) {
+function print_emits() {
+  for (i = 0; i < emits.length; i++) {
     console.log(emits[i].caller + " emitting event " + emits[i].event);
   }
 }
@@ -81,10 +80,6 @@ function main() {
   });
 
   walkAST.walkAddParent(ast, collect_emitting_nodes);
-
-  if (emitEvents.length != emitNodeCallingFunctions.length) {
-    throw "Error: number of emit events, emit calling functions, and emit nodes should be the same length";
-  }
 
   print_emits();
 
