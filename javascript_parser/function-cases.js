@@ -1,16 +1,22 @@
-// function examples
+const EventEmitter = require('event');
+const util = require('util');
 
-function func1() { emit_obj.emit('func1Emit');};
+// function examples
+function func1() {
+  emit_obj.emit('func1Emit');
+};
 var func2 = function () { emit_obj.emit('func2Emit');};
-var func3 = function func3_1() { emit_obj.emit('func3Emit'); };
+var func3 = function func3_1() {
+  emit_obj.emit('func3Emit');
+};
 
 (function func4() { emit_obj.emit('func4Emit'); });
 (function () { emit_obj.emit('anon0Emit'); });
 
-// var func5 = function func5_1() {(function () { emit_obj.emit('func5Emit'); );
-// }();
-// var func6 = function () {(function () { emit_obj.emit('func6Emit'); });
-// }();
+var func5 = function func5_1() {(function () { emit_obj.emit('func5Emit');
+})}();
+var func6 = function () {(function () { emit_obj.emit('func6Emit'); });
+}();
 
 var obj1 = { func7: function func7_1(){(function () {emit_obj.emit('func7Emit');});
 } };
@@ -30,6 +36,7 @@ function counter2() {
   return function() {
     emit_obj.emit('c2Emit');
     alert(count2++);
+    myEmitter.on('func3Emit', func3);
   }
 }
 
@@ -51,4 +58,18 @@ var func10 = (emit_obj) => emit_obj.emit('func10Emit');
 // server.on('connection', (stream) => {
 //   console.log('someone connected!');
 // });
+//
+function MyEmitter() {
+  EventEmitter.call(this);
+}
+util.inherits(MyEmitter, EventEmitter);
+
+const myEmitter = new MyEmitter();
+myEmitter.on('anonArrowFuncEmit', () => {
+  console.log('an event occurred!');
+});
+myEmitter.on('func1Emit', func1);
+myEmitter.on('func2Emit', func2);
+
+myEmitter.on('func4Emit', func4);
 
