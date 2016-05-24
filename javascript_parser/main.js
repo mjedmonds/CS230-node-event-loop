@@ -22,9 +22,11 @@ function Emit(event, caller, emit_src, caller_src) {
 }
 
 // Listener class, represents an event and a corresponding callback
-function Listener(event, callback_name, event_src, callback_name_src) {
+// XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function
+function Listener(event, callback_name, once, event_src, callback_name_src) {
   this.event = event;
   this.callback_name = callback_name;
+  this.once = once;
   this.event_src = event_src;
   this.callback_src = callback_name_src;
 }
@@ -61,7 +63,7 @@ function find_function_name(parent, child) {
 
 // finds the calling function of this AST node
 function find_calling_function(node) {
-  // global emit will not have a parent
+  // global emit will not have a parent, "Program" is the parent in the AST
   if (!node.hasOwnProperty("parent")) {
     return "Program";
   }
@@ -99,17 +101,24 @@ function find_callback_function(callback) {
 }
 
 function collect_listeners(node) {
-  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2 && node.expression.callee.property.name == "on") {
+  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2) {
+    if (node.expression.callee.property.name == "on"){
+      once = false;
+    } else if (node.expression.callee.property.name == "once"){
+      once = true;
+    } else { // return if this isn't an on() or once()
+      return
+    }
     //console.log("found on()");
     event = node.expression.arguments[0];
     callback_func = find_callback_function(node.expression.arguments[1]);
-    listeners.push(new Listener(event.value, callback_func[0], new SourceInfo(file, event.loc.start), new SourceInfo(file, callback_func[1])));
+    listeners.push(new Listener(event.value, callback_func[0], once, new SourceInfo(file, event.loc.start), new SourceInfo(file, callback_func[1])));
   }
 }
 
 function ast_walker(node) {
   var emit_found = collect_emits(node);
-  // only look for listeners if we didn't find an emit
+  // only look for listeners if we didn't find an emit, no reason to look for listeners if we found an emit
   if (!emit_found) {
     collect_listeners(node);
   }
@@ -124,7 +133,7 @@ function print_emits() {
 
 function print_listeners() {
   for (i = 0; i < listeners.length; i++) {
-    console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name);
+    console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name + "; once: " + listeners[i].once);
   }
 }
 
@@ -140,7 +149,8 @@ function main() {
   //print_emits();
   print_listeners();
 
-  console.log(JSON.stringify(ast))
+
+  //console.log(JSON.stringify(ast))
 }
 
 main()
