@@ -83,8 +83,8 @@ function collect_emits(node) {
   //types.push(node.type)
   //nodesWithTypes.push(node)
   if (node.type == "Identifier" && node.hasOwnProperty("name") && node.name == "emit") {
-    emit_ret = find_emit_event(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
-    calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
+    var emit_ret = find_emit_event(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
+    var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
     emits.push(new Emit(emit_ret[0], calling_func[0], new SourceInfo(file, emit_ret[1]), new SourceInfo(file, calling_func[1])));
     return true;
   } else {
@@ -102,16 +102,17 @@ function find_callback_function(callback) {
 
 function collect_listeners(node) {
   if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2) {
+    var once;
     if (node.expression.callee.property.name == "on"){
       once = false;
     } else if (node.expression.callee.property.name == "once"){
       once = true;
     } else { // return if this isn't an on() or once()
-      return
+      return;
     }
     //console.log("found on()");
-    event = node.expression.arguments[0];
-    callback_func = find_callback_function(node.expression.arguments[1]);
+    var event = node.expression.arguments[0];
+    var callback_func = find_callback_function(node.expression.arguments[1]);
     listeners.push(new Listener(event.value, callback_func[0], once, new SourceInfo(file, event.loc.start), new SourceInfo(file, callback_func[1])));
   }
 }
@@ -126,14 +127,18 @@ function ast_walker(node) {
 }
 
 function print_emits() {
-  for (i = 0; i < emits.length; i++) {
+  for (var i = 0; i < emits.length; i++) {
     console.log(emits[i].caller + " emitting event " + emits[i].event);
   }
 }
 
 function print_listeners() {
-  for (i = 0; i < listeners.length; i++) {
-    console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name + "; once: " + listeners[i].once);
+  for (var i = 0; i < listeners.length; i++) {
+    if (listeners[i].once) {
+      console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name + " once");
+    } else {
+      console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name);
+    }
   }
 }
 

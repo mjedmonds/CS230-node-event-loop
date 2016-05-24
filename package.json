@@ -1,5 +1,5 @@
 {
-  "name": "javascript_parser",
+  "name": "node_monitor",
   "version": "1.0.0",
   "description": "AST analyzer",
   "main": "parser.js",
