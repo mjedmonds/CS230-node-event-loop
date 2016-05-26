@@ -7,6 +7,8 @@ var emits = [];
 var listeners = [];
 var unknownCount = 0;
 
+/* ---- CLASSES ---- */
+
 function SourceInfo(filename, loc) {
   this.filename = filename;
   this.loc = loc;
@@ -31,7 +33,10 @@ function Listener(event, callback_name, once, event_src, callback_name_src) {
   this.callback_src = callback_name_src;
 }
 
-function hasOwnProperty(obj, prop) {
+/* ---------------------------------------------------------------- */
+
+// determines if obj has the property prop
+function has_own_property(obj, prop) {
   var proto = obj.__proto__ || obj.constructor.prototype;
   return (prop in obj) &&
     (!(prop in proto) || proto[prop] !== obj[prop]);
@@ -64,13 +69,13 @@ function find_function_name(parent, child) {
 // finds the calling function of this AST node
 function find_calling_function(node) {
   // global emit will not have a parent, "Program" is the parent in the AST
-  if (!node.hasOwnProperty("parent")) {
+  if (!node.has_own_property("parent")) {
     return "Program";
   }
 
   var parent = node.parent;
 
-  if (parent.hasOwnProperty("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression")) {
+  if (parent.has_own_property("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression")) {
     //console.log("found function for emit");
     return find_function_name(parent, node);
   } else {
@@ -78,11 +83,11 @@ function find_calling_function(node) {
   }
 }
 
-// collects emitting node information (event and caller)
+// collects emitting node information (event and caller) and registers them into the emits global var
 function collect_emits(node) {
   //types.push(node.type)
   //nodesWithTypes.push(node)
-  if (node.type == "Identifier" && node.hasOwnProperty("name") && node.name == "emit") {
+  if (node.type == "Identifier" && node.has_own_property("name") && node.name == "emit") {
     var emit_ret = find_emit_event(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
     var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
     emits.push(new Emit(emit_ret[0], calling_func[0], new SourceInfo(file, emit_ret[1]), new SourceInfo(file, calling_func[1])));
@@ -92,6 +97,7 @@ function collect_emits(node) {
   }
 }
 
+// returns the function name of a callback (or anon if unknown)
 function find_callback_function(callback) {
   if (callback.name != null) {
     return [callback.name, callback.loc.start];
@@ -100,6 +106,7 @@ function find_callback_function(callback) {
   }
 }
 
+// finds all on() and once() calls and registers them into the listeners var
 function collect_listeners(node) {
   if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2) {
     var once;
@@ -117,6 +124,7 @@ function collect_listeners(node) {
   }
 }
 
+// main walking function to traverse each AST node
 function ast_walker(node) {
   var emit_found = collect_emits(node);
   // only look for listeners if we didn't find an emit, no reason to look for listeners if we found an emit

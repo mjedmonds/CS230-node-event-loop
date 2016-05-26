@@ -43,11 +43,12 @@ const util = require('util');
 // var func9 = (emit_obj) => { emit_obj.emit('func9Emit'); };
 // var func10 = (emit_obj) => emit_obj.emit('func10Emit');
 
+// XXX: it looks like these are not relevant, Function is assumed to already be a function (e.g. function Function() {})
 // var func11 = new Function();
 // var func12 = new Function.apply(this);
 //
 // Function.apply(this).apply(this);
-//
+
 // //example of emit
 // var emittingFunc = function () {
 //   a = 5 + 2;
@@ -59,19 +60,21 @@ const util = require('util');
 //   console.log('someone connected!');
 // });
 //
-function MyEmitter() {
-  EventEmitter.call(this);
-}
-util.inherits(MyEmitter, EventEmitter);
-
-const myEmitter = new MyEmitter();
-myEmitter.on('anonArrowFuncEmit', () => {
-  console.log('an event occurred!');
-});
-myEmitter.on('func1Emit', func1);
-myEmitter.on('func2Emit', func2);
-
-myEmitter.on('func4Emit', func4);
-
-myEmitter.once('func5Emit', func5);
+// function MyEmitter() {
+//   EventEmitter.call(this);
+// }
+// util.inherits(MyEmitter, EventEmitter);
+//
+// const myEmitter = new MyEmitter();
+//
+// myEmitter.on('anonArrowFuncEmit', () => {
+//   console.log('an event occurred!');
+// });
+//
+// myEmitter.on('func1Emit', func1);
+// myEmitter.on('func2Emit', func2);
+//
+// myEmitter.on('func4Emit', func4);
+//
+// myEmitter.once('func5Emit', func5);
 
