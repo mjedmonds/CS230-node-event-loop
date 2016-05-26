@@ -35,86 +35,113 @@ function Listener(event, callback_name, once, event_src, callback_name_src) {
 
 /* ---------------------------------------------------------------- */
 
-// determines if obj has the property prop
-function has_own_property(obj, prop) {
-  var proto = obj.__proto__ || obj.constructor.prototype;
-  return (prop in obj) &&
-    (!(prop in proto) || proto[prop] !== obj[prop]);
-}
-
 // finds an the event emitting by an emit() node in the AST
-function find_emit_event(parent) {
-  if (parent.type == "CallExpression") {
+function find_emit_event_name(parent)
+{
+  if (parent.type == "CallExpression")
+  {
     //console.log("found event: " + parent.arguments[0].value);
     return [parent.arguments[0].value, parent.loc.start];
-  } else {
-    return find_emit_event(parent.parent);
+  }
+  else
+  {
+    return find_emit_event_name(parent.parent);
   }
 }
 
 // finds the function name of a calling function
-function find_function_name(parent, child) {
-  if (parent == null) {
+function find_function_name(parent, child)
+{
+  if (parent == null)
+  { // anonymous function case
     // console.log("found function name: anon" + unknownCount);
-    return ["anon" + unknownCount++, child.loc.start];
-  } else if (parent.id == null) {
+    return ['anon' + unknownCount++, child.loc.start];
+  }
+  else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name'))
+  { // handle special case of anonymous function that is a value in key/value pair
+    return [parent.key.name, parent.key.loc.start];
+  }
+  else if (!parent.id)
+  { // otherwise if parent is null, recurse down parent looking for the function
     // console.log("found null parent.id, parent.type: " + parent.type);
     return find_function_name(parent.parent, parent);
-  } else {
+  }
+  else
+  {
     // console.log("found function name: " + parent.id.name)
     return [parent.id.name, parent.loc.start];
   }
 }
 
 // finds the calling function of this AST node
-function find_calling_function(node) {
+function find_calling_function(node)
+{
   // global emit will not have a parent, "Program" is the parent in the AST
-  if (!node.has_own_property("parent")) {
+  if (!node.hasOwnProperty("parent"))
+  { // if the node doesn't have a parent, we are at the end of the AST
     return "Program";
   }
 
   var parent = node.parent;
 
-  if (parent.has_own_property("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression")) {
+  if (parent.hasOwnProperty("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression"))
+  { // if we find a function, look for its name
     //console.log("found function for emit");
     return find_function_name(parent, node);
-  } else {
+  }
+  else
+  { // otherwise recurse up the parent
     return find_calling_function(parent);
   }
 }
 
 // collects emitting node information (event and caller) and registers them into the emits global var
-function collect_emits(node) {
+function collect_emits(node)
+{
   //types.push(node.type)
   //nodesWithTypes.push(node)
-  if (node.type == "Identifier" && node.has_own_property("name") && node.name == "emit") {
-    var emit_ret = find_emit_event(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
+  if (node.type == "Identifier" && node.hasOwnProperty("name") && node.name == "emit")
+  { // found an emit
+    var emit_ret = find_emit_event_name(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
     var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
     emits.push(new Emit(emit_ret[0], calling_func[0], new SourceInfo(file, emit_ret[1]), new SourceInfo(file, calling_func[1])));
     return true;
-  } else {
+  }
+  else
+  { // didn't find an emit
     return false;
   }
 }
 
 // returns the function name of a callback (or anon if unknown)
-function find_callback_function(callback) {
-  if (callback.name != null) {
+function find_callback_function(callback)
+{
+  if (callback.name != null)
+  {
     return [callback.name, callback.loc.start];
-  } else {
+  }
+  else
+  {
     return ["anon" + unknownCount++, callback.body.loc.start];
   }
 }
 
 // finds all on() and once() calls and registers them into the listeners var
-function collect_listeners(node) {
-  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2) {
+function collect_listeners(node)
+{
+  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2)
+  {
     var once;
-    if (node.expression.callee.property.name == "on"){
+    if (node.expression.callee.property.name == "on")
+    {
       once = false;
-    } else if (node.expression.callee.property.name == "once"){
+    }
+    else if (node.expression.callee.property.name == "once")
+    {
       once = true;
-    } else { // return if this isn't an on() or once()
+    }
+    else
+    { // return if this isn't an on() or once()
       return;
     }
     //console.log("found on()");
@@ -125,32 +152,42 @@ function collect_listeners(node) {
 }
 
 // main walking function to traverse each AST node
-function ast_walker(node) {
+function ast_walker(node)
+{
   var emit_found = collect_emits(node);
   // only look for listeners if we didn't find an emit, no reason to look for listeners if we found an emit
-  if (!emit_found) {
+  if (!emit_found)
+  {
     collect_listeners(node);
   }
   // console.log(node.type)
 }
 
-function print_emits() {
-  for (var i = 0; i < emits.length; i++) {
+function print_emits()
+{
+  for (var i = 0; i < emits.length; i++)
+  {
     console.log(emits[i].caller + " emitting event " + emits[i].event);
   }
 }
 
-function print_listeners() {
-  for (var i = 0; i < listeners.length; i++) {
-    if (listeners[i].once) {
+function print_listeners()
+{
+  for (var i = 0; i < listeners.length; i++)
+  {
+    if (listeners[i].once)
+    {
       console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name + " once");
-    } else {
+    }
+    else
+    {
       console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name);
     }
   }
 }
 
-function main() {
+function main()
+{
   var src = fs.readFileSync(file);
 
   var ast = esprima.parse(src, {
@@ -159,10 +196,9 @@ function main() {
 
   walkAST.walkAddParent(ast, ast_walker);
 
-  //print_emits();
+  print_emits();
   print_listeners();
-
-
+  
   //console.log(JSON.stringify(ast))
 }
 
