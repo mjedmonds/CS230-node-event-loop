@@ -7,6 +7,16 @@ var emits = [];
 var listeners = [];
 var unknownCount = 0;
 
+// var bunyan = require('bunyan');
+// var log = bunyan.createLogger({
+//   name: 'CS230',
+//   streams: [ {level: 'info', path: 'out.txt'}]
+//
+// });
+
+var e_array = [];
+var l_array = [];
+
 /* ---- CLASSES ---- */
 
 function SourceInfo(filename, loc) {
@@ -186,6 +196,32 @@ function print_listeners()
   }
 }
 
+function log_emits()
+{
+  for (var i = 0; i < emits.length; i++)
+  {
+    e_array.push([emits[i].emit_src.loc.line,
+      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')']);
+  }
+}
+
+function log_listeners()
+{
+  for (var i = 0; i < listeners.length; i++)
+  {
+    if (listeners[i].once)
+    {
+      l_array.push([listeners[i].event_src.loc.line,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name +  'once' + '\')']);
+    }
+    else
+    {
+      l_array.push([listeners[i].event_src.loc.line,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + '\')']);
+    }
+  }
+}
+
 function main()
 {
   var src = fs.readFileSync(file);
@@ -200,6 +236,20 @@ function main()
   print_listeners();
   
   //console.log(JSON.stringify(ast))
+
+  log_emits();
+  log_listeners();
+
+  // for(var k = 0; k < e_array.length; k++)
+  // {
+  //   console.log(e_array[k][0] + " " + e_array[k][1]);
+  // }
+  //
+  // for(var l = 0; l < l_array.length; l++)
+  // {
+  //   console.log(l_array[l][0] + " " + l_array[l][1]);
+  // }
+
 }
 
 main()
