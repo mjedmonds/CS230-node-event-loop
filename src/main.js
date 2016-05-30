@@ -34,7 +34,7 @@ function Emit(event, caller, emit_src, caller_src) {
 }
 
 // Listener class, represents an event and a corresponding callback
-// XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function
+// XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function?
 function Listener(event, callback_name, once, event_src, callback_name_src) {
   this.event = event;
   this.callback_name = callback_name;
