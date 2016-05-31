@@ -4,13 +4,13 @@ const util = require('util');
 // function examples
 function func1() {
   emit_obj.emit('func1Emit');
-log.info('func1 emitting event func1Emit')
+  log.info('func1 emitting event func1Emit')
 };
 var func2 = function () { emit_obj.emit('func2Emit');};
 log.info('func2 emitting event func2Emit')
 var func3 = function func3_1() {
   emit_obj.emit('func3Emit');
-log.info('func3_1 emitting event func3Emit')
+  log.info('func3_1 emitting event func3Emit')
 };
 
 (function func4() { emit_obj.emit('func4Emit'); });
@@ -36,9 +36,9 @@ function counter1() {
   var count1 = 0;
   return function c1() {
     emit_obj.emit('c1Emit');
-log.info('c1 emitting event c1Emit')
+    log.info('c1 emitting event c1Emit')
     emit_obj.emit('c1Emit2');
-log.info('c1 emitting event c1Emit2')
+    log.info('c1 emitting event c1Emit2')
     alert(count1++);
   }
 }
@@ -47,10 +47,10 @@ function counter2() {
   var count2 = 0;
   return function() {
     emit_obj.emit('c2Emit');
-log.info('counter2 emitting event c2Emit')
+    log.info('counter2 emitting event c2Emit')
     alert(count2++);
     myEmitter.on('func3Emit', func3);
-log.info('func3Emit triggers callback func3')
+    log.info('func3Emit triggers callback func3')
   }
 }
 
@@ -71,7 +71,7 @@ log.info('func10 emitting event func10Emit')
 var emittingFunc = function () {
   a = 5 + 2;
   emit_obj.emit('emmitFuncEmit');
-log.info('emittingFunc emitting event emmitFuncEmit')
+  log.info('emittingFunc emitting event emmitFuncEmit')
 }
 
 // example of listener

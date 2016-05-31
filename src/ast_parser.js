@@ -53,7 +53,7 @@ module.exports = {
     var listener_logs = log_listeners();
     var emit_logs = log_emits();
     var logs = emit_logs.concat(listener_logs)
-    logs.sort(compare_logs);
+    logs.sort(compare_logs); // sort the logs by line number/position
     return logs;
   }
 }
