@@ -16,20 +16,14 @@ function main()
 {
   var logs = ast_parser.collect_loggings('./function-cases.js');
 
-  var emit_logs = logs[0];
-  var listener_logs = logs[1];
 
+  insertor.insert('./function-cases.js', logs);
   //console.log(JSON.stringify(ast))
 
-  for(var k = 0; k < emit_logs.length; k++)
-  {
-    console.log(emit_logs[k][0] + " " + emit_logs[k][1]);
-  }
-
-  for(var l = 0; l < listener_logs.length; l++)
-  {
-    console.log(listener_logs[l][0] + " " + listener_logs[l][1]);
-  }
+  // for(var k = 0; k < logs.length; k++)
+  // {
+  //   console.log(logs[k][0] + " " + logs[k][1]);
+  // }
 
 }
 

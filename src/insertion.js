@@ -30,6 +30,7 @@ function insert_tuples(file_arr, insert_tuple)
 {
   while (insert_tuple.length)
   {
+    // the -2 is account for 1) line indexing starts at 1, but array indexing starts at 0 and 2) want to insert log before emit
     file_arr.splice(insert_tuple[insert_tuple.length - 1][0], 0, insert_tuple[insert_tuple.length - 1][1])
     insert_tuple.pop();
   }

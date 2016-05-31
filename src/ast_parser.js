@@ -3,20 +3,22 @@ const esprima = require('esprima');
 const walkAST = require('esprima-walk');
 
 var emits = [];
-var listeners =[];
+var listeners = [];
 var unknown_count = 0;
 var filename;
 
 /* ---- CLASSES ---- */
 
-function SourceInfo(filename, loc) {
+function SourceInfo(filename, loc)
+{
   this.filename = filename;
   this.loc = loc;
 }
 
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
-function Emit(event, caller, emit_src, caller_src) {
+function Emit(event, caller, emit_src, caller_src)
+{
   this.event = event; // event being triggered
   this.emit_src = emit_src; // info on where the emit is located in source
   this.caller = caller; // fucntion triggering event
@@ -25,7 +27,8 @@ function Emit(event, caller, emit_src, caller_src) {
 
 // Listener class, represents an event and a corresponding callback
 // XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function?
-function Listener(event, callback_name, once, event_src, callback_name_src) {
+function Listener(event, callback_name, once, event_src, callback_name_src)
+{
   this.event = event;
   this.callback_name = callback_name;
   this.once = once;
@@ -36,7 +39,8 @@ function Listener(event, callback_name, once, event_src, callback_name_src) {
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function collect_loggings(fname){
+  collect_loggings: function collect_loggings(fname)
+  {
     filename = fname;
     var src = fs.readFileSync(filename);
 
@@ -48,7 +52,9 @@ module.exports = {
 
     var listener_logs = log_listeners();
     var emit_logs = log_emits();
-    return [emit_logs, listener_logs];
+    var logs = emit_logs.concat(listener_logs)
+    logs.sort(compare_logs);
+    return logs;
   }
 }
 
@@ -180,6 +186,22 @@ function ast_walker(node)
   // console.log(node.type)
 }
 
+function compare_logs(log_a, log_b)
+{
+  if (log_a[0] < log_b[0])
+  {
+    return -1;
+  }
+  else if (log_a[0] > log_b[0])
+  {
+    return 1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+
 function print_emits()
 {
   for (var i = 0; i < emits.length; i++)
@@ -222,7 +244,7 @@ function log_listeners(listener_logs)
     if (listeners[i].once)
     {
       listener_logs.push([listeners[i].event_src.loc.line,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name +  'once' + '\')']);
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + 'once' + '\')']);
     }
     else
     {
