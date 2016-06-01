@@ -2,6 +2,19 @@ const fs = require('fs');
 const esprima = require('esprima');
 const walkAST = require('esprima-walk');
 
+// array that represents the nessecary calls to bunyan to enable logging
+// Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
+// this will be inserted after the last require() call in the source. If no require is found, insert at the beginning
+const bunyan_insert_arr = [
+  'const bunyan = require(\'bunyan\');',
+  'var log = bunyan.createLogger({',
+  'name: \'',
+  '\',',
+  'streams: [ {level: \'info\', path: \'',
+  '\'}]',
+  '});'
+];
+
 var emits = [];
 var listeners = [];
 var unknown_count = 0;
@@ -118,16 +131,34 @@ function find_calling_function(node)
   }
 }
 
+// returns the end loc of the next enclosing block statement
+function find_enclosing_block_stmt(node)
+{
+  if (node.hasOwnProperty('type') && node.type == 'BlockStatement')
+  {
+    return node.loc.end;
+  }
+  else if (node.type == 'Program')
+  {
+    return null;
+  }
+  else
+  {
+    return find_enclosing_block_stmt(node.parent);
+  }
+}
+
 // collects emitting node information (event and caller) and registers them into the emits global var
 function collect_emits(node)
 {
-  //types.push(node.type)
-  //nodesWithTypes.push(node)
   if (node.type == "Identifier" && node.hasOwnProperty("name") && node.name == "emit")
   { // found an emit
     var emit_ret = find_emit_event_name(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
     var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
-    emits.push(new Emit(emit_ret[0], calling_func[0], new SourceInfo(filename, emit_ret[1]), new SourceInfo(filename, calling_func[1])));
+    var emit_src = new SourceInfo(filename, emit_ret[1]);
+    var calling_func_src = new SourceInfo(filename, calling_func[1]);
+
+    emits.push(new Emit(emit_ret[0], calling_func[0], emit_src, calling_func_src));
     return true;
   }
   else
@@ -170,7 +201,9 @@ function collect_listeners(node)
     //console.log("found on()");
     var event = node.expression.arguments[0];
     var callback_func = find_callback_function(node.expression.arguments[1]);
-    listeners.push(new Listener(event.value, callback_func[0], once, new SourceInfo(filename, event.loc.start), new SourceInfo(filename, callback_func[1])));
+    var event_src = new SourceInfo(filename, event.loc.start);
+    var calling_func_src = new SourceInfo(filename, callback_func[1]);
+    listeners.push(new Listener(event.value, callback_func[0], once, event_src, calling_func_src));
   }
 }
 
@@ -186,6 +219,7 @@ function ast_walker(node)
   // console.log(node.type)
 }
 
+// compares two logging tuples by looking at their line numbers
 function compare_logs(log_a, log_b)
 {
   if (log_a[0] < log_b[0])

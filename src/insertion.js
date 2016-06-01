@@ -1,12 +1,12 @@
 // const readline = require('readline');
 const fs = require('fs');
-var LineByLineReader = require('line-by-line');
-
+const LineByLineReader = require('line-by-line');
 
 module.exports = {
-  insert: function insert(file, insert_tuple)
+  // parameters
+  insert: function insert(filename, insert_tuple, bunyan_insert_pos)
   {
-    var lr = new LineByLineReader(file);
+    var lr = new LineByLineReader(filename);
     var file_arr = []; // array that represents a file
 
     lr.on('line', function (line)
@@ -20,7 +20,7 @@ module.exports = {
     {
       file_arr = insert_tuples(file_arr, insert_tuple);// All lines are read, file is closed now.
       //console.log(file_arr);
-      var out_file = file.substr(0, file.lastIndexOf('.')) + '_mod' + file.substr(file.lastIndexOf('.'), file.length);
+      var out_file = filename.substr(0, filename.lastIndexOf('.')) + '_mod' + filename.substr(filename.lastIndexOf('.'), filename.length);
       write_file_arr(file_arr, out_file);
     });
   }
