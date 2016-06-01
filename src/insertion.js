@@ -1,10 +1,11 @@
 // const readline = require('readline');
 const fs = require('fs');
 const LineByLineReader = require('line-by-line');
+const util = require('./util');
 
 module.exports = {
   // parameters
-  insert: function insert(filename, insert_tuple, bunyan_insert_pos)
+  insert: function insert(filename, log_items, bunyan_insert_pos)
   {
     var lr = new LineByLineReader(filename);
     var file_arr = []; // array that represents a file
@@ -18,27 +19,51 @@ module.exports = {
     // once we're done reading the file, insert the tuples and write
     lr.on('end', function ()
     {
-      file_arr = insert_tuples(file_arr, insert_tuple);// All lines are read, file is closed now.
+      file_arr = insert_log_items(file_arr, log_items);// All lines are read, file is closed now.
       //console.log(file_arr);
-      var out_file = filename.substr(0, filename.lastIndexOf('.')) + '_mod' + filename.substr(filename.lastIndexOf('.'), filename.length);
+      var out_file = util.append_filename(filename, '_mod');
       write_file_arr(file_arr, out_file);
     });
   }
 }
 
-function insert_tuples(file_arr, insert_tuple)
+// log_items should be a sorted list of lines to insert
+function insert_log_items(file_arr, log_items)
 {
-  while (insert_tuple.length)
+  var log_item;
+  var insert_line_num;
+  var ori_line_idx;
+  var whitespace_str;
+  var insert_str;
+  while (log_items.length)
   {
-    var insert_line_num = insert_tuple[insert_tuple.length - 1][0];
-    var ori_line_idx =  insert_line_num - 1;
-    var whitespace_str = get_leading_whitespace(file_arr[ori_line_idx]);
-    var insert_str = whitespace_str + insert_tuple[insert_tuple.length - 1][1];
+    log_item = log_items[log_items.length - 1];
+    insert_line_num = determine_insert_loc(log_item);
+    ori_line_idx = insert_line_num - 1;
+    whitespace_str = get_leading_whitespace(file_arr[ori_line_idx]);
+    insert_str = whitespace_str + log_items[log_items.length - 1][1];
     // the -2 is account for 1) line indexing starts at 1, but array indexing starts at 0 and 2) want to insert log before emit
     file_arr.splice(insert_line_num, 0, insert_str);
-    insert_tuple.pop();
+    log_items.pop();
   }
   return file_arr;
+}
+
+function determine_insert_loc(log_item)
+{
+  if (log_item.blk_loc == null)
+  { // case where emit is not within a block statement (it is only within the top level Program)
+    return log_item.e_loc;
+  }
+  else if (log_item.blk_loc.line != log_item.e_loc.line)
+  { // if the blk_loc isn't on the same line (e.g. the block doesn't 
+    log_item.e_loc.line += 1;
+    return log_item.e_loc;
+  }
+  else if (log_item.blk_loc == log_item)
+  {
+
+  }
 }
 
 function get_leading_whitespace(line)
@@ -70,5 +95,5 @@ function write_file_arr(file_arr, filename)
   file.end();
 }
 
-//console.log(insert(file_str, insert_tuple));
+//console.log(insert(file_str, log_item));
 

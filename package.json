@@ -8,11 +8,17 @@
   },
   "author": "Mark Edmonds",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mjedmonds/Node-Callback-Tracing"
+  },
   "dependencies": {
     "esprima": "^2.7.2",
     "esprima-walk": "^0.1.0",
     "fs": "^0.0.2",
     "bunyan": "^1.8.1",
-    "line-by-line": "^0.1.4"
+    "line-by-line": "^0.1.4",
+    "js-beautify": "^1.6.2",
+    "esformatter-braces": "^1.2.1"
   }
 }

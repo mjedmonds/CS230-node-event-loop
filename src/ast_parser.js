@@ -1,6 +1,11 @@
 const fs = require('fs');
 const esprima = require('esprima');
 const walkAST = require('esprima-walk');
+const esformatter = require('esformatter');
+const util = require('./util');
+
+//register esformatter-braces manually so we don't need a config
+esformatter.register(require('esformatter-braces'));
 
 // array that represents the nessecary calls to bunyan to enable logging
 // Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
@@ -30,12 +35,13 @@ function SourceInfo(filename, loc)
 
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
-function Emit(event, caller, emit_src, caller_src)
+function Emit(event, caller, emit_src, caller_src, block_stmt_src)
 {
   this.event = event; // event being triggered
   this.emit_src = emit_src; // info on where the emit is located in source
   this.caller = caller; // fucntion triggering event
   this.caller_src = caller_src; // info on where the caller is located in source
+  this.block_stmt_src = block_stmt_src; // the enclosing block statement
 }
 
 // Listener class, represents an event and a corresponding callback
@@ -49,13 +55,22 @@ function Listener(event, callback_name, once, event_src, callback_name_src)
   this.callback_src = callback_name_src;
 }
 
+// e_loc can be an emit or event loc
+function LogItem(e_loc, blk_loc, log_str, filename)
+{
+  this.e_loc = e_loc;
+  this.blk_loc = blk_loc;
+  this.log_str = log_str;
+  this.filename = filename;
+}
+
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function collect_loggings(fname)
+  collect_loggings: function collect_loggings(filename)
   {
-    filename = fname;
-    var src = fs.readFileSync(filename);
+    // read the file, format it to have braces, write it, load the formatted version
+    var src = format_file(filename);
 
     var ast = esprima.parse(src, {
       loc: true
@@ -66,9 +81,19 @@ module.exports = {
     var listener_logs = log_listeners();
     var emit_logs = log_emits();
     var logs = emit_logs.concat(listener_logs)
-    logs.sort(compare_logs); // sort the logs by line number/position
+    logs.sort(compare_logs); // sort the logs by e_loc's
     return logs;
   }
+}
+
+// this ensures the every loop/conditional has braces surrounding it (needed for AST to parse BlockStatements)
+function format_file(filename)
+{
+  var src = fs.readFileSync(filename).toString();
+  src = esformatter.format(src);
+  fs.writeFileSync(util.append_filename(filename, '_formatted'), src);
+  src = fs.readFileSync(util.append_filename(filename, '_formatted'));
+  return src;
 }
 
 // finds an the event emitting by an emit() node in the AST
@@ -132,19 +157,19 @@ function find_calling_function(node)
 }
 
 // returns the end loc of the next enclosing block statement
-function find_enclosing_block_stmt(node)
+function find_enclosing_blk_stmt(node)
 {
   if (node.hasOwnProperty('type') && node.type == 'BlockStatement')
   {
     return node.loc.end;
   }
   else if (node.type == 'Program')
-  {
+  { // if we are at the root of the AST, don't recurse
     return null;
   }
   else
-  {
-    return find_enclosing_block_stmt(node.parent);
+  { // recurse down the parent
+    return find_enclosing_blk_stmt(node.parent);
   }
 }
 
@@ -158,7 +183,8 @@ function collect_emits(node)
     var emit_src = new SourceInfo(filename, emit_ret[1]);
     var calling_func_src = new SourceInfo(filename, calling_func[1]);
 
-    emits.push(new Emit(emit_ret[0], calling_func[0], emit_src, calling_func_src));
+    var block_stmt_src = new SourceInfo(filename, find_enclosing_blk_stmt(node));
+    emits.push(new Emit(emit_ret[0], calling_func[0], emit_src, calling_func_src, block_stmt_src));
     return true;
   }
   else
@@ -219,21 +245,10 @@ function ast_walker(node)
   // console.log(node.type)
 }
 
-// compares two logging tuples by looking at their line numbers
+// compares two LogItems by looking at their e_loc's, used to sort array of log inserts
 function compare_logs(log_a, log_b)
 {
-  if (log_a[0] < log_b[0])
-  {
-    return -1;
-  }
-  else if (log_a[0] > log_b[0])
-  {
-    return 1;
-  }
-  else
-  {
-    return 0;
-  }
+  return util.compare_loc(log_a.e_loc, log_b.e_loc);
 }
 
 function print_emits()
@@ -264,26 +279,28 @@ function log_emits()
   var emit_logs = [];
   for (var i = 0; i < emits.length; i++)
   {
-    emit_logs.push([emits[i].emit_src.loc.line,
-      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')']);
+    emit_logs.push(new LogItem(emits[i].emit_src.loc, emits[i].block_stmt_src.loc,
+      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')', emits[i].emit_src.filename));
   }
   return emit_logs;
 }
 
-function log_listeners(listener_logs)
+function log_listeners()
 {
   var listener_logs = [];
   for (var i = 0; i < listeners.length; i++)
   {
     if (listeners[i].once)
     {
-      listener_logs.push([listeners[i].event_src.loc.line,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + 'once' + '\')']);
+      listener_logs.push(new LogItem(listeners[i].event_src.loc, listeners[i].block_stmt_src.loc,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + ' once' + '\')',
+        listeners[i].event_src.filename));
     }
     else
     {
-      listener_logs.push([listeners[i].event_src.loc.line,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + '\')']);
+      listener_logs.push(new LogItem(listeners[i].event_src.loc, listeners[i].block_stmt_src.loc,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + ' once' + '\')',
+        listeners[i].event_src.filename));
     }
   }
   return listener_logs;

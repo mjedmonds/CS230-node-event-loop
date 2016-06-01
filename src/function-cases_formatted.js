@@ -2,7 +2,9 @@ const EventEmitter = require('event');
 const util = require('util');
 
 
-if(true) console.log('test');
+if (true) {
+  console.log('test');
+}
 
 // // function examples
 // function func1() {

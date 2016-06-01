@@ -1,6 +1,9 @@
 const EventEmitter = require('event');
 const util = require('util');
 
+
+if(true) console.log('test');
+
 // // function examples
 // function func1() {
 //   emit_obj.emit('func1Emit');
@@ -12,12 +15,11 @@ const util = require('util');
 //
 // (function func4() { emit_obj.emit('func4Emit'); });
 // (function () { emit_obj.emit('anon0Emit'); });
-
+//
 // var func5 = function func5_1() {(function () { emit_obj.emit('func5Emit');
 // })}();
-var func6 = function () {(function () { emit_obj.emit('func6Emit'); });
-log.info('func6 emitting event func6Emit')
-}();
+// var func6 = function () {(function () { emit_obj.emit('func6Emit'); });
+// }();
 //
 // var obj1 = { func7: function func7_1(){(function () {emit_obj.emit('func7Emit');});
 // } };
@@ -44,7 +46,7 @@ log.info('func6 emitting event func6Emit')
 //
 // var func9 = (emit_obj) => { emit_obj.emit('func9Emit'); };
 // var func10 = (emit_obj) => emit_obj.emit('func10Emit');
-//
+
 // /* ------------------------------------------------------------- */
 // // // XXX: it looks like these are not relevant, Function is assumed to already be a function (e.g. function Function() {})
 // // // var func11 = new Function();
