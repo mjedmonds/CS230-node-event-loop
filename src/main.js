@@ -3,6 +3,7 @@ const esformatter = require('esformatter');
 
 const insertor = require('./insertion');
 const ast_parser =  require('./ast_parser');
+const util = require('./util');
 
 //register esformatter-braces manually so we don't need a config
 esformatter.register(require('esformatter-braces'));
@@ -27,7 +28,6 @@ function main()
   var src = format_file(filename, esformatter_opts);
 
   var logs = ast_parser.collect_loggings(src, filename);
-
 
   insertor.insert('./function-cases.js', logs);
   //console.log(JSON.stringify(ast))

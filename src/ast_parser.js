@@ -67,7 +67,7 @@ module.exports = {
     listeners = [];
     unknown_count = 0;
     filename = fname;
-    
+
     var ast = esprima.parse(src, {
       loc: true
     });
@@ -153,6 +153,10 @@ function find_enclosing_blk_stmt(node)
   { // if we are at the root of the AST, don't recurse
     return null;
   }
+  else if (node.type == 'ArrowFunctionExpression')
+  { // special case where we hit an arrow function before a block statement 
+    return -1;
+  }
   else
   { // recurse down the parent
     return find_enclosing_blk_stmt(node.parent);
@@ -169,7 +173,7 @@ function collect_emits(node)
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var emit_loc = emit_ret[1];
     var calling_func_loc = calling_func[1];
-    
+
     emits.push(new Emit(emit_ret[0], calling_func[0], emit_loc, calling_func_loc, blk_stmt_loc, filename));
     return true;
   }
