@@ -31,19 +31,18 @@ module.exports = {
 function insert_log_items(file_arr, log_items)
 {
   var log_item;
-  var insert_line_num;
-  var ori_line_idx;
+  var insert_loc;
+  var ori_loc;
   var whitespace_str;
   var insert_str;
   while (log_items.length)
   {
     log_item = log_items[log_items.length - 1];
-    insert_line_num = determine_insert_loc(log_item);
-    ori_line_idx = insert_line_num - 1;
-    whitespace_str = get_leading_whitespace(file_arr[ori_line_idx]);
+    insert_loc = determine_insert_loc(log_item);
+    whitespace_str = get_leading_whitespace();
     insert_str = whitespace_str + log_items[log_items.length - 1][1];
     // the -2 is account for 1) line indexing starts at 1, but array indexing starts at 0 and 2) want to insert log before emit
-    file_arr.splice(insert_line_num, 0, insert_str);
+    file_arr.splice(insert_loc.end.line, 0, insert_str);
     log_items.pop();
   }
   return file_arr;

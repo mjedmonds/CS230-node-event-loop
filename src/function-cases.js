@@ -1,9 +1,9 @@
-const EventEmitter = require('event');
-const util = require('util');
+// const EventEmitter = require('event');
+// const util = require('util');
 
 
-if(true) console.log('test');
-
+// if(true) console.log('test');
+//
 // // function examples
 // function func1() {
 //   emit_obj.emit('func1Emit');
@@ -45,7 +45,7 @@ if(true) console.log('test');
 // }
 //
 // var func9 = (emit_obj) => { emit_obj.emit('func9Emit'); };
-// var func10 = (emit_obj) => emit_obj.emit('func10Emit');
+var func10 = (emit_obj) => emit_obj.emit('func10Emit');
 
 // /* ------------------------------------------------------------- */
 // // // XXX: it looks like these are not relevant, Function is assumed to already be a function (e.g. function Function() {})

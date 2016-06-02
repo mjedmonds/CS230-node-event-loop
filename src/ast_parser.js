@@ -1,11 +1,7 @@
 const fs = require('fs');
 const esprima = require('esprima');
 const walkAST = require('esprima-walk');
-const esformatter = require('esformatter');
 const util = require('./util');
-
-//register esformatter-braces manually so we don't need a config
-esformatter.register(require('esformatter-braces'));
 
 // array that represents the nessecary calls to bunyan to enable logging
 // Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
@@ -27,32 +23,29 @@ var filename;
 
 /* ---- CLASSES ---- */
 
-function SourceInfo(filename, loc)
-{
-  this.filename = filename;
-  this.loc = loc;
-}
+
 
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
-function Emit(event, caller, emit_src, caller_src, block_stmt_src)
+function Emit(event, caller, emit_loc, caller_loc, blk_stmt_loc, filename)
 {
   this.event = event; // event being triggered
-  this.emit_src = emit_src; // info on where the emit is located in source
-  this.caller = caller; // fucntion triggering event
-  this.caller_src = caller_src; // info on where the caller is located in source
-  this.block_stmt_src = block_stmt_src; // the enclosing block statement
+  this.caller = caller; //
+  this.emit_loc = emit_loc; // loc of emit
+  this.caller_loc = caller_loc; // loc of caller's beginning
+  this.blk_stmt_loc = blk_stmt_loc; // loc of event's block statement ending
+  this.filename = filename;
 }
 
 // Listener class, represents an event and a corresponding callback
 // XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function?
-function Listener(event, callback_name, once, event_src, callback_name_src)
+function Listener(event, callback, once, listener_loc, filename)
 {
   this.event = event;
-  this.callback_name = callback_name;
+  this.callback = callback;
   this.once = once;
-  this.event_src = event_src;
-  this.callback_src = callback_name_src;
+  this.listener_loc = listener_loc; // loc of listener
+  this.filename = filename;
 }
 
 // e_loc can be an emit or event loc
@@ -67,11 +60,14 @@ function LogItem(e_loc, blk_loc, log_str, filename)
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function collect_loggings(filename)
+  collect_loggings: function collect_loggings(src, fname)
   {
-    // read the file, format it to have braces, write it, load the formatted version
-    var src = format_file(filename);
-
+    // clear previous file's data
+    emits = [];
+    listeners = [];
+    unknown_count = 0;
+    filename = fname;
+    
     var ast = esprima.parse(src, {
       loc: true
     });
@@ -86,23 +82,13 @@ module.exports = {
   }
 }
 
-// this ensures the every loop/conditional has braces surrounding it (needed for AST to parse BlockStatements)
-function format_file(filename)
-{
-  var src = fs.readFileSync(filename).toString();
-  src = esformatter.format(src);
-  fs.writeFileSync(util.append_filename(filename, '_formatted'), src);
-  src = fs.readFileSync(util.append_filename(filename, '_formatted'));
-  return src;
-}
-
 // finds an the event emitting by an emit() node in the AST
 function find_emit_event_name(parent)
 {
   if (parent.type == "CallExpression")
   {
     //console.log("found event: " + parent.arguments[0].value);
-    return [parent.arguments[0].value, parent.loc.start];
+    return [parent.arguments[0].value, parent.loc];
   }
   else
   {
@@ -116,11 +102,11 @@ function find_function_name(parent, child)
   if (parent == null)
   { // anonymous function case
     // console.log("found function name: anon" + unknown_count);
-    return ['anon' + unknown_count++, child.loc.start];
+    return ['anon' + unknown_count++, child.loc];
   }
   else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name'))
   { // handle special case of anonymous function that is a value in key/value pair
-    return [parent.key.name, parent.key.loc.start];
+    return [parent.key.name, parent.key.loc];
   }
   else if (!parent.id)
   { // otherwise if parent is null, recurse down parent looking for the function
@@ -130,7 +116,7 @@ function find_function_name(parent, child)
   else
   {
     // console.log("found function name: " + parent.id.name)
-    return [parent.id.name, parent.loc.start];
+    return [parent.id.name, parent.loc];
   }
 }
 
@@ -161,7 +147,7 @@ function find_enclosing_blk_stmt(node)
 {
   if (node.hasOwnProperty('type') && node.type == 'BlockStatement')
   {
-    return node.loc.end;
+    return node.loc;
   }
   else if (node.type == 'Program')
   { // if we are at the root of the AST, don't recurse
@@ -180,11 +166,11 @@ function collect_emits(node)
   { // found an emit
     var emit_ret = find_emit_event_name(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
     var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
-    var emit_src = new SourceInfo(filename, emit_ret[1]);
-    var calling_func_src = new SourceInfo(filename, calling_func[1]);
-
-    var block_stmt_src = new SourceInfo(filename, find_enclosing_blk_stmt(node));
-    emits.push(new Emit(emit_ret[0], calling_func[0], emit_src, calling_func_src, block_stmt_src));
+    var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
+    var emit_loc = emit_ret[1];
+    var calling_func_loc = calling_func[1];
+    
+    emits.push(new Emit(emit_ret[0], calling_func[0], emit_loc, calling_func_loc, blk_stmt_loc, filename));
     return true;
   }
   else
@@ -198,11 +184,11 @@ function find_callback_function(callback)
 {
   if (callback.name != null)
   {
-    return [callback.name, callback.loc.start];
+    return [callback.name, callback.loc];
   }
   else
   {
-    return ["anon" + unknown_count++, callback.body.loc.start];
+    return ["anon" + unknown_count++, callback.body.loc];
   }
 }
 
@@ -227,9 +213,8 @@ function collect_listeners(node)
     //console.log("found on()");
     var event = node.expression.arguments[0];
     var callback_func = find_callback_function(node.expression.arguments[1]);
-    var event_src = new SourceInfo(filename, event.loc.start);
-    var calling_func_src = new SourceInfo(filename, callback_func[1]);
-    listeners.push(new Listener(event.value, callback_func[0], once, event_src, calling_func_src));
+    var calling_func_loc = callback_func[1];
+    listeners.push(new Listener(event.value, callback_func[0], once, event.loc, calling_func_loc, filename));
   }
 }
 
@@ -248,7 +233,7 @@ function ast_walker(node)
 // compares two LogItems by looking at their e_loc's, used to sort array of log inserts
 function compare_logs(log_a, log_b)
 {
-  return util.compare_loc(log_a.e_loc, log_b.e_loc);
+  return util.compare_loc(log_a.e_loc.start, log_b.e_loc.start);
 }
 
 function print_emits()
@@ -265,11 +250,11 @@ function print_listeners()
   {
     if (listeners[i].once)
     {
-      console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name + " once");
+      console.log(listeners[i].event + " triggers callback " + listeners[i].callback + " once");
     }
     else
     {
-      console.log(listeners[i].event + " triggers callback " + listeners[i].callback_name);
+      console.log(listeners[i].event + " triggers callback " + listeners[i].callback);
     }
   }
 }
@@ -279,8 +264,8 @@ function log_emits()
   var emit_logs = [];
   for (var i = 0; i < emits.length; i++)
   {
-    emit_logs.push(new LogItem(emits[i].emit_src.loc, emits[i].block_stmt_src.loc,
-      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')', emits[i].emit_src.filename));
+    emit_logs.push(new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
+      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')', emits[i].filename));
   }
   return emit_logs;
 }
@@ -292,15 +277,15 @@ function log_listeners()
   {
     if (listeners[i].once)
     {
-      listener_logs.push(new LogItem(listeners[i].event_src.loc, listeners[i].block_stmt_src.loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + ' once' + '\')',
-        listeners[i].event_src.filename));
+      listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\')',
+        listeners[i].filename));
     }
     else
     {
-      listener_logs.push(new LogItem(listeners[i].event_src.loc, listeners[i].block_stmt_src.loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback_name + ' once' + '\')',
-        listeners[i].event_src.filename));
+      listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\')',
+        listeners[i].filename));
     }
   }
   return listener_logs;

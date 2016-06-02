@@ -2,21 +2,25 @@ module.exports = {
 // compares two loc objects
   compare_loc: function compare_loc(loc_a, loc_b)
   {
-    if (loc_a.line < loc_b.line)
+    var a_line = Number(loc_a.line);
+    var b_line = Number(loc_b.line);
+    if (a_line < b_line)
     {
       return -1;
     }
-    else if (loc_a.line > loc_b.line)
+    else if (a_line > b_line)
     {
       return 1;
     }
     else
     { // lines are equal, comapre columns
-      if (loc_a.column < loc_b.column)
+      var a_col = Number(loc_a.column);
+      var b_col = Number(loc_b.column);
+      if (a_col < b_col)
       {
         return -1;
       }
-      else if (loc_a.column > loc_b.column)
+      else if (a_col > b_col)
       {
         return 1;
       }
