@@ -56,7 +56,7 @@ function BlkStmtLoc(loc, root, arrow)
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function collect_loggings(src, fname)
+  collect_loggings: function (src, fname)
   {
     // clear previous file's data
     emits = [];
@@ -76,7 +76,7 @@ module.exports = {
     logs.sort(compare_logs); // sort the logs by e_loc's
     return logs;
   }
-}
+};
 
 // finds an the event emitting by an emit() node in the AST
 function find_emit_event_name(parent)
@@ -278,7 +278,7 @@ function log_emits()
   for (var i = 0; i < emits.length; i++)
   {
     emit_logs.push(new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
-      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\');', emits[i].filename));
+      'lumberjack.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\');', emits[i].filename));
   }
   return emit_logs;
 }
@@ -291,13 +291,13 @@ function log_listeners()
     if (listeners[i].once)
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\');',
+        'lumberjack.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\');',
         listeners[i].filename));
     }
     else
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + '\');',
+        'lumberjack.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + '\');',
         listeners[i].filename));
     }
   }

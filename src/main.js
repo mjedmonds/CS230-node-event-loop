@@ -1,7 +1,7 @@
 const fs = require('fs');
 const esformatter = require('esformatter');
 
-const insertor = require('./insertion');
+const inserter = require('./inserter');
 const ast_parser =  require('./ast_parser');
 const util = require('./util');
 
@@ -29,7 +29,9 @@ function main()
 
   var logs = ast_parser.collect_loggings(src, filename);
 
-  insertor.insert(util.append_filename(filename, '_formatted'), logs);
+  var newfilename = inserter.insert(util.append_filename(filename, '_formatted'), logs);
+
+  format_file(newfilename, esformatter_opts);
 }
 
 main()
