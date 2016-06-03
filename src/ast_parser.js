@@ -3,19 +3,6 @@ const esprima = require('esprima');
 const walkAST = require('esprima-walk');
 const util = require('./util');
 
-// array that represents the nessecary calls to bunyan to enable logging
-// Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
-// this will be inserted after the last require() call in the source. If no require is found, insert at the beginning
-const bunyan_insert_arr = [
-  'const bunyan = require(\'bunyan\');',
-  'var log = bunyan.createLogger({',
-  'name: \'',
-  '\',',
-  'streams: [ {level: \'info\', path: \'',
-  '\'}]',
-  '});'
-];
-
 var emits = [];
 var listeners = [];
 var unknown_count = 0;
@@ -23,28 +10,26 @@ var filename;
 
 /* ---- CLASSES ---- */
 
-
-
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
-function Emit(event, caller, emit_loc, caller_loc, blk_stmt_loc, filename)
+function Emit(event, caller, emit_loc, blk_stmt_loc, filename)
 {
   this.event = event; // event being triggered
   this.caller = caller; //
   this.emit_loc = emit_loc; // loc of emit
-  this.caller_loc = caller_loc; // loc of caller's beginning
   this.blk_stmt_loc = blk_stmt_loc; // loc of event's block statement ending
   this.filename = filename;
 }
 
 // Listener class, represents an event and a corresponding callback
 // XXX: callback_name_src is the same line number as the on()/once(). It should be the line up of the actual callback function?
-function Listener(event, callback, once, listener_loc, filename)
+function Listener(event, callback, once, listener_loc, blk_stmt_loc, filename)
 {
   this.event = event;
   this.callback = callback;
   this.once = once;
   this.listener_loc = listener_loc; // loc of listener
+  this.blk_stmt_loc = blk_stmt_loc; // loc of the block statement
   this.filename = filename;
 }
 
@@ -55,6 +40,17 @@ function LogItem(e_loc, blk_loc, log_str, filename)
   this.blk_loc = blk_loc;
   this.log_str = log_str;
   this.filename = filename;
+}
+
+// represents a block statement loc. Can be at the root of the program (e.g. no higher block statement exists
+// or can be at an arrow function without braces (another special case for how to insert log).
+// possible values: loc = loc object/null, root = true/false, arrow = true/false
+// This object would be a union in other languages, so only one item should be set to the first possible value at a time
+function BlkStmtLoc(loc, root, arrow)
+{
+  this.loc = loc;
+  this.root = root;
+  this.arrow = arrow;
 }
 
 /* ---------------------------------------------------------------- */
@@ -88,7 +84,7 @@ function find_emit_event_name(parent)
   if (parent.type == "CallExpression")
   {
     //console.log("found event: " + parent.arguments[0].value);
-    return [parent.arguments[0].value, parent.loc];
+    return parent.arguments[0].value;
   }
   else
   {
@@ -97,48 +93,48 @@ function find_emit_event_name(parent)
 }
 
 // finds the function name of a calling function
-function find_function_name(parent, child)
+function find_function_name(parent)
 {
   if (parent == null)
   { // anonymous function case
     // console.log("found function name: anon" + unknown_count);
-    return ['anon' + unknown_count++, child.loc];
+    return 'anon' + unknown_count++;
   }
   else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name'))
   { // handle special case of anonymous function that is a value in key/value pair
-    return [parent.key.name, parent.key.loc];
+    return parent.key.name;
   }
   else if (!parent.id)
   { // otherwise if parent is null, recurse down parent looking for the function
     // console.log("found null parent.id, parent.type: " + parent.type);
-    return find_function_name(parent.parent, parent);
+    return find_function_name(parent.parent);
   }
   else
   {
     // console.log("found function name: " + parent.id.name)
-    return [parent.id.name, parent.loc];
+    return parent.id.name;
   }
 }
 
 // finds the calling function of this AST node
-function find_calling_function(node)
+function find_emit_calling_function(node)
 {
   // global emit will not have a parent, "Program" is the parent in the AST
-  if (!node.hasOwnProperty("parent"))
+  if (!node.hasOwnProperty('parent'))
   { // if the node doesn't have a parent, we are at the end of the AST
-    return "Program";
+    return 'Program';
   }
 
   var parent = node.parent;
 
-  if (parent.hasOwnProperty("type") && (parent.type == "FunctionExpression" || parent.type == "FunctionDeclaration" || parent.type == "ArrowFunctionExpression"))
+  if (parent.hasOwnProperty('type') && (parent.type == 'FunctionExpression' || parent.type == 'FunctionDeclaration' || parent.type == 'ArrowFunctionExpression'))
   { // if we find a function, look for its name
     //console.log("found function for emit");
-    return find_function_name(parent, node);
+    return find_function_name(parent);
   }
   else
   { // otherwise recurse up the parent
-    return find_calling_function(parent);
+    return find_emit_calling_function(parent);
   }
 }
 
@@ -147,15 +143,15 @@ function find_enclosing_blk_stmt(node)
 {
   if (node.hasOwnProperty('type') && node.type == 'BlockStatement')
   {
-    return node.loc;
+    return new BlkStmtLoc(node.loc, false, false);
   }
   else if (node.type == 'Program')
   { // if we are at the root of the AST, don't recurse
-    return null;
+    return new BlkStmtLoc(null, true, false);
   }
   else if (node.type == 'ArrowFunctionExpression')
   { // special case where we hit an arrow function before a block statement 
-    return -1;
+    return new BlkStmtLoc(null, false, true);
   }
   else
   { // recurse down the parent
@@ -163,18 +159,30 @@ function find_enclosing_blk_stmt(node)
   }
 }
 
+// determines the start and end loc of the corresponding CallExpression of an emit()
+function find_call_expr_loc(node)
+{
+  if (node.hasOwnProperty('type') && node.type == 'CallExpression')
+  {
+    return node.loc;
+  }
+  else
+  {
+    return find_call_expr_loc(node.parent)
+  }
+}
+
 // collects emitting node information (event and caller) and registers them into the emits global var
 function collect_emits(node)
 {
-  if (node.type == "Identifier" && node.hasOwnProperty("name") && node.name == "emit")
+  if (node.type == 'Identifier' && node.hasOwnProperty('name') && node.name == 'emit')
   { // found an emit
-    var emit_ret = find_emit_event_name(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
-    var calling_func = find_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
+    var emit_event = find_emit_event_name(node.parent);            // emit_ret[0] = event name, emit_ret[1] = loc of emit()
+    var calling_func = find_emit_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
-    var emit_loc = emit_ret[1];
-    var calling_func_loc = calling_func[1];
-
-    emits.push(new Emit(emit_ret[0], calling_func[0], emit_loc, calling_func_loc, blk_stmt_loc, filename));
+    var emit_loc = find_call_expr_loc(node.parent);
+    
+    emits.push(new Emit(emit_event, calling_func, emit_loc, blk_stmt_loc, filename));
     return true;
   }
   else
@@ -188,11 +196,11 @@ function find_callback_function(callback)
 {
   if (callback.name != null)
   {
-    return [callback.name, callback.loc];
+    return callback.name;
   }
   else
   {
-    return ["anon" + unknown_count++, callback.body.loc];
+    return "anon" + unknown_count++;
   }
 }
 
@@ -217,8 +225,9 @@ function collect_listeners(node)
     //console.log("found on()");
     var event = node.expression.arguments[0];
     var callback_func = find_callback_function(node.expression.arguments[1]);
-    var calling_func_loc = callback_func[1];
-    listeners.push(new Listener(event.value, callback_func[0], once, event.loc, calling_func_loc, filename));
+    var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
+    var calling_func_loc = node.loc;          // already at the CallExpression/ExpressionStatement in the AST
+    listeners.push(new Listener(event.value, callback_func, once, calling_func_loc, blk_stmt_loc, filename));
   }
 }
 
@@ -269,7 +278,7 @@ function log_emits()
   for (var i = 0; i < emits.length; i++)
   {
     emit_logs.push(new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
-      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\')', emits[i].filename));
+      'log.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\');', emits[i].filename));
   }
   return emit_logs;
 }
@@ -282,13 +291,13 @@ function log_listeners()
     if (listeners[i].once)
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\')',
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\');',
         listeners[i].filename));
     }
     else
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\')',
+        'log.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + '\');',
         listeners[i].filename));
     }
   }

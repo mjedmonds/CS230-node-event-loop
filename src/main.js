@@ -20,7 +20,7 @@ function format_file(filename, esformatter_opts)
 
 function main()
 {
-  var filename = './function-cases.js';
+  var filename = '../test/function-cases.js';
   var esformatter_opts = fs.readFileSync('../esformatter_options.json');
   esformatter_opts = JSON.parse(esformatter_opts);
 
@@ -29,14 +29,7 @@ function main()
 
   var logs = ast_parser.collect_loggings(src, filename);
 
-  insertor.insert('./function-cases.js', logs);
-  //console.log(JSON.stringify(ast))
-
-  // for(var k = 0; k < logs.length; k++)
-  // {
-  //   console.log(logs[k][0] + " " + logs[k][1]);
-  // }
-
+  insertor.insert(util.append_filename(filename, '_formatted'), logs);
 }
 
 main()
