@@ -1,8 +1,8 @@
 {
-  "name": "node_monitor",
+  "name": "Lumberjack.js",
   "version": "1.0.0",
-  "description": "AST analyzer",
-  "main": "parser.js",
+  "description": "Mechanism to inject log of callbacks triggered by events in Node.js",
+  "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,7 +10,7 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git://github.com/mjedmonds/Node-Callback-Tracing"
+    "url": "git://github.com/mjedmonds/Lumberjack.js"
   },
   "dependencies": {
     "esprima": "^2.7.2",

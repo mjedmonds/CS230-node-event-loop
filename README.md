@@ -1,5 +1,5 @@
-# Node-Callback-Tracing
-Mechanism to inject log of callbacks triggered by events in Node.js
+# Lumberjack.js
+Mechanism to insert log of callbacks triggered by events in Node.js
 
 ### Install
 ```
