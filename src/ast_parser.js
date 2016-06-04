@@ -5,7 +5,7 @@ const util = require('./util');
 
 var emits = [];
 var listeners = [];
-var unknown_count = 0;
+var emit_triggers = new Array();
 var filename;
 
 /* ---- CLASSES ---- */
@@ -34,11 +34,12 @@ function Listener(event, callback, once, listener_loc, blk_stmt_loc, filename)
 }
 
 // e_loc can be an emit or event loc
-function LogItem(e_loc, blk_loc, log_str, filename)
+function LogItem(e_loc, blk_loc, log_str, triggers, filename)
 {
   this.e_loc = e_loc;
   this.blk_loc = blk_loc;
   this.log_str = log_str;
+  this.triggers = triggers; //functions triggered by this event (only valid for
   this.filename = filename;
 }
 
@@ -53,6 +54,12 @@ function BlkStmtLoc(loc, root, arrow)
   this.arrow = arrow;
 }
 
+function LogCollection(logs, triggers)
+{
+  this.logs = logs;
+  this.triggers = triggers;
+}
+
 /* ---------------------------------------------------------------- */
 
 module.exports = {
@@ -61,7 +68,7 @@ module.exports = {
     // clear previous file's data
     emits = [];
     listeners = [];
-    unknown_count = 0;
+    emit_triggers = new Array();
     filename = fname;
 
     var ast = esprima.parse(src, {
@@ -70,10 +77,12 @@ module.exports = {
 
     walkAST.walkAddParent(ast, ast_walker);
 
+    collect_emit_triggers();
     var listener_logs = log_listeners();
     var emit_logs = log_emits();
     var logs = emit_logs.concat(listener_logs)
     logs.sort(compare_logs); // sort the logs by e_loc's
+    //var log_collection = new LogCollection(logs, trigger_logs);
     return logs;
   }
 };
@@ -98,7 +107,7 @@ function find_function_name(parent)
   if (parent == null)
   { // anonymous function case
     // console.log("found function name: anon" + unknown_count);
-    return 'anon' + unknown_count++;
+    return null;
   }
   else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name'))
   { // handle special case of anonymous function that is a value in key/value pair
@@ -181,7 +190,7 @@ function collect_emits(node)
     var calling_func = find_emit_calling_function(node.parent);  // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var emit_loc = find_call_expr_loc(node.parent);
-    
+
     emits.push(new Emit(emit_event, calling_func, emit_loc, blk_stmt_loc, filename));
     return true;
   }
@@ -191,7 +200,7 @@ function collect_emits(node)
   }
 }
 
-// returns the function name of a callback (or anon if unknown)
+// returns the function name of a callback (or null if unknown)
 function find_callback_function(callback)
 {
   if (callback.name != null)
@@ -200,7 +209,7 @@ function find_callback_function(callback)
   }
   else
   {
-    return "anon" + unknown_count++;
+    return null;
   }
 }
 
@@ -227,7 +236,26 @@ function collect_listeners(node)
     var callback_func = find_callback_function(node.expression.arguments[1]);
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var calling_func_loc = node.loc;          // already at the CallExpression/ExpressionStatement in the AST
+    if (callback_func == null){
+      callback_func = 'anon_' + node.loc.start.line;
+    }
     listeners.push(new Listener(event.value, callback_func, once, calling_func_loc, blk_stmt_loc, filename));
+  }
+}
+
+function collect_emit_triggers()
+{
+  var event, callback;
+  for (var i = 0; i < listeners.length; i++)
+  {
+    event = listeners[i].event;
+    callback = listeners[i].callback;
+    if (!(listeners[i].event in emit_triggers))
+    {
+      emit_triggers.push(event);
+      emit_triggers[event] = [];
+    }
+    emit_triggers[event].push(callback);
   }
 }
 
@@ -278,7 +306,8 @@ function log_emits()
   for (var i = 0; i < emits.length; i++)
   {
     emit_logs.push(new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
-      'lumberjack.info(\'' + emits[i].caller + ' emitting event ' + emits[i].event + '\');', emits[i].filename));
+      'lumberjack.info(\'function \\\'' + emits[i].caller + '\\\' emitting event \\\'' + emits[i].event + '\\\'\');',
+      log_triggers(emits[i].event, emits[i].caller), emits[i].filename));
   }
   return emit_logs;
 }
@@ -291,15 +320,24 @@ function log_listeners()
     if (listeners[i].once)
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'lumberjack.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + ' once' + '\');',
-        listeners[i].filename));
+        'lumberjack.info(\'\\\'' + listeners[i].event + '\\\' triggers callback \\\'' + listeners[i].callback + '\\\' once' + '\');',
+        [], listeners[i].filename));
     }
     else
     {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
-        'lumberjack.info(\'' + listeners[i].event + ' triggers callback ' + listeners[i].callback + '\');',
-        listeners[i].filename));
+        'lumberjack.info(\'\\\'' + listeners[i].event + '\\\' triggers callback \\\'' + listeners[i].callback + '\\\'\');',
+        [], listeners[i].filename));
     }
   }
   return listener_logs;
+}
+
+function log_triggers(event, caller)
+{
+  var triggers = [];
+  for(var i = 0; event in emit_triggers && i < emit_triggers[event].length; i++){
+    triggers.push('lumberjack.info(\t\'\\\'' + caller + '\\\' -> \\\'' + emit_triggers[event][i] + '\\\'\');');
+  }
+  return triggers;
 }

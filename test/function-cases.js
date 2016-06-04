@@ -48,36 +48,37 @@ function counter2() {
 var func9 = (emit_obj) => { emit_obj.emit('func9Emit'); };
 var func10 = (emit_obj) => emit_obj.emit('func10Emit');
 
-//
-// //example of emit
-// var emittingFunc = function () {
-//   a = 5 + 2;
-//   emit_obj.emit('emmitFuncEmit');
-// }
-//
-// // example of listener
-// // server.on('connection', (stream) => {
-// //   console.log('someone connected!');
-// // });
-//
-// function MyEmitter() {
-//   EventEmitter.call(this);
-// }
-// util.inherits(MyEmitter, EventEmitter);
-//
-// const myEmitter = new MyEmitter();
-//
-// myEmitter.on('anonArrowFuncEmit', () => {
-//   console.log('an event occurred!');
+
+//example of emit
+var emittingFunc = function () {
+  a = 5 + 2;
+  emit_obj.emit('emmitFuncEmit');
+}
+
+// example of listener
+// server.on('connection', (stream) => {
+//   console.log('someone connected!');
 // });
-//
-// myEmitter.on('func1Emit', func1);
-// myEmitter.on('func2Emit', func2);
-//
-// myEmitter.on('func4Emit', func4);
-//
-// myEmitter.once('func5Emit', func5);
-//
+
+function MyEmitter() {
+  EventEmitter.call(this);
+}
+util.inherits(MyEmitter, EventEmitter);
+
+const myEmitter = new MyEmitter();
+
+myEmitter.on('anonArrowFuncEmit', () => {
+  console.log('an event occurred!');
+});
+
+myEmitter.on('func1Emit', func11);
+myEmitter.on('func1Emit', func16);
+myEmitter.on('func2Emit', func12);
+
+myEmitter.on('func4Emit', func13);
+
+myEmitter.once('func5Emit', func15);
+
 
 
 // /* ------------------------------------------------------------- */
