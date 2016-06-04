@@ -1,3 +1,5 @@
+/*jshint esversion: 6 */
+
 const fs = require('fs');
 const esprima = require('esprima');
 const walkAST = require('esprima-walk');
@@ -5,10 +7,12 @@ const util = require('./util');
 
 var emits = [];
 var listeners = [];
-var emit_triggers = new Array();
+var emit_triggers = [];
 var filename;
 
 /* ---- CLASSES ---- */
+
+
 
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
@@ -68,7 +72,7 @@ module.exports = {
     // clear previous file's data
     emits = [];
     listeners = [];
-    emit_triggers = new Array();
+    emit_triggers = [];
     filename = fname;
 
     var ast = esprima.parse(src, {
@@ -80,7 +84,7 @@ module.exports = {
     collect_emit_triggers();
     var listener_logs = log_listeners();
     var emit_logs = log_emits();
-    var logs = emit_logs.concat(listener_logs)
+    var logs = emit_logs.concat(listener_logs);
     logs.sort(compare_logs); // sort the logs by e_loc's
     //var log_collection = new LogCollection(logs, trigger_logs);
     return logs;
@@ -104,7 +108,7 @@ function find_emit_event_name(parent)
 // finds the function name of a calling function
 function find_function_name(parent)
 {
-  if (parent == null)
+  if (parent === null)
   { // anonymous function case
     // console.log("found function name: anon" + unknown_count);
     return null;
@@ -177,7 +181,7 @@ function find_call_expr_loc(node)
   }
   else
   {
-    return find_call_expr_loc(node.parent)
+    return find_call_expr_loc(node.parent);
   }
 }
 
@@ -203,7 +207,7 @@ function collect_emits(node)
 // returns the function name of a callback (or null if unknown)
 function find_callback_function(callback)
 {
-  if (callback.name != null)
+  if (callback.name !== null)
   {
     return callback.name;
   }
@@ -236,7 +240,7 @@ function collect_listeners(node)
     var callback_func = find_callback_function(node.expression.arguments[1]);
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var calling_func_loc = node.loc;          // already at the CallExpression/ExpressionStatement in the AST
-    if (callback_func == null){
+    if (callback_func === null){
       callback_func = 'anon_' + node.loc.start.line;
     }
     listeners.push(new Listener(event.value, callback_func, once, calling_func_loc, blk_stmt_loc, filename));

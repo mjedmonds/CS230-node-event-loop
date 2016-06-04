@@ -1,3 +1,5 @@
+/*jshint esversion: 6 */
+
 const inserter = require('./inserter');
 const ast_parser =  require('./ast_parser');
 const util = require('./util');
@@ -15,4 +17,4 @@ function main()
 
 }
 
-main()
+main();
