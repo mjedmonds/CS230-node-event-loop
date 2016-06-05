@@ -18,6 +18,8 @@
     "fs": "^0.0.2",
     "bunyan": "^1.8.1",
     "esformatter-braces": "^1.2.1",
-    "esformatter": "^0.9.4"
+    "esformatter": "^0.9.4",
+    "fs-extra": "^0.30.0",
+    "mkdirp": "^0.5.1"
   }
 }

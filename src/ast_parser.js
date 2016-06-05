@@ -12,8 +12,6 @@ var filename;
 
 /* ---- CLASSES ---- */
 
-
-
 // Emit class, represents and emit and a corresponding caller
 //function Emit(event, caller, emit_src_info, caller_src_info) {
 function Emit(event, caller, emit_loc, blk_stmt_loc, filename) {
@@ -62,7 +60,7 @@ function LogCollection(logs, triggers) {
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function(src, fname) {
+  collect_loggings: function (src, fname) {
     // clear previous file's data
     emits = [];
     listeners = [];
@@ -90,24 +88,33 @@ function find_emit_event_name(parent) {
   if (parent.type == "CallExpression") {
     //console.log("found event: " + parent.arguments[0].value);
     return parent.arguments[0].value;
-  } else {
+  }
+  else {
     return find_emit_event_name(parent.parent);
   }
 }
 
 // finds the function name of a calling function
 function find_function_name(parent) {
-  if (parent === null) { // anonymous function case
-    // console.log("found function name: anon" + unknown_count);
-    return null;
-  } else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name')) { // handle special case of anonymous function that is a value in key/value pair
-    return parent.key.name;
-  } else if (!parent.id) { // otherwise if parent is null, recurse down parent looking for the function
-    // console.log("found null parent.id, parent.type: " + parent.type);
-    return find_function_name(parent.parent);
-  } else {
-    // console.log("found function name: " + parent.id.name)
-    return parent.id.name;
+  try {
+    if (parent === null || parent === undefined) { // anonymous function case
+      // console.log("found function name: anon" + unknown_count);
+      return null;
+    }
+    else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name')) { // handle special case of anonymous function that is a value in key/value pair
+      return parent.key.name;
+    }
+    else if (!parent.id) { // otherwise if parent is null, recurse down parent looking for the function
+      // console.log("found null parent.id, parent.type: " + parent.type);
+      return find_function_name(parent.parent);
+    }
+    else {
+      // console.log("found function name: " + parent.id.name)
+      return parent.id.name;
+    }
+  }
+  catch (err){
+    console.error(err)
   }
 }
 
@@ -123,7 +130,8 @@ function find_emit_calling_function(node) {
   if (parent.hasOwnProperty('type') && (parent.type == 'FunctionExpression' || parent.type == 'FunctionDeclaration' || parent.type == 'ArrowFunctionExpression')) { // if we find a function, look for its name
     //console.log("found function for emit");
     return find_function_name(parent);
-  } else { // otherwise recurse up the parent
+  }
+  else { // otherwise recurse up the parent
     return find_emit_calling_function(parent);
   }
 }
@@ -132,11 +140,14 @@ function find_emit_calling_function(node) {
 function find_enclosing_blk_stmt(node) {
   if (node.hasOwnProperty('type') && node.type == 'BlockStatement') {
     return new BlkStmtLoc(node.loc, false, false);
-  } else if (node.type == 'Program') { // if we are at the root of the AST, don't recurse
+  }
+  else if (node.type == 'Program') { // if we are at the root of the AST, don't recurse
     return new BlkStmtLoc(null, true, false);
-  } else if (node.type == 'ArrowFunctionExpression') { // special case where we hit an arrow function before a block statement 
+  }
+  else if (node.type == 'ArrowFunctionExpression') { // special case where we hit an arrow function before a block statement 
     return new BlkStmtLoc(null, false, true);
-  } else { // recurse down the parent
+  }
+  else { // recurse down the parent
     return find_enclosing_blk_stmt(node.parent);
   }
 }
@@ -145,7 +156,8 @@ function find_enclosing_blk_stmt(node) {
 function find_call_expr_loc(node) {
   if (node.hasOwnProperty('type') && node.type == 'CallExpression') {
     return node.loc;
-  } else {
+  }
+  else {
     return find_call_expr_loc(node.parent);
   }
 }
@@ -160,7 +172,8 @@ function collect_emits(node) {
 
     emits.push(new Emit(emit_event, calling_func, emit_loc, blk_stmt_loc, filename));
     return true;
-  } else { // didn't find an emit
+  }
+  else { // didn't find an emit
     return false;
   }
 }
@@ -169,21 +182,29 @@ function collect_emits(node) {
 function find_callback_function(callback) {
   if (callback.name !== null) {
     return callback.name;
-  } else {
+  }
+  else {
     return null;
   }
 }
 
 // finds all on() and once() calls and registers them into the listeners var
 function collect_listeners(node) {
-  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2) {
+  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2
+    && node.expression.callee.hasOwnProperty('property') && node.expression.callee.property.hasOwnProperty('name')) {
     var once;
-    if (node.expression.callee.property.name == "on") {
-      once = false;
-    } else if (node.expression.callee.property.name == "once") {
-      once = true;
-    } else { // return if this isn't an on() or once()
-      return;
+    try {
+      if (node.expression.callee.property.name == "on") {
+        once = false;
+      }
+      else if (node.expression.callee.property.name == "once") {
+        once = true;
+      }
+      else { // return if this isn't an on() or once()
+        return;
+      }
+    } catch (err) {
+      console.error(filename + ' at ' + node.loc.end.line + 'caused error: ' + err);
     }
     //console.log("found on()");
     var event = node.expression.arguments[0];
@@ -235,7 +256,8 @@ function print_listeners() {
   for (var i = 0; i < listeners.length; i++) {
     if (listeners[i].once) {
       console.log(listeners[i].event + " triggers callback " + listeners[i].callback + " once");
-    } else {
+    }
+    else {
       console.log(listeners[i].event + " triggers callback " + listeners[i].callback);
     }
   }
@@ -257,7 +279,8 @@ function log_listeners() {
     if (listeners[i].once) {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
         'lumberjack.info(\'\\\'' + listeners[i].event + '\\\' triggers callback \\\'' + listeners[i].callback + '\\\' once' + '\');', [], listeners[i].filename));
-    } else {
+    }
+    else {
       listener_logs.push(new LogItem(listeners[i].listener_loc, listeners[i].blk_stmt_loc,
         'lumberjack.info(\'\\\'' + listeners[i].event + '\\\' triggers callback \\\'' + listeners[i].callback + '\\\'\');', [], listeners[i].filename));
     }
@@ -268,7 +291,7 @@ function log_listeners() {
 function log_triggers(event, caller) {
   var triggers = [];
   for (var i = 0; event in emit_triggers && i < emit_triggers[event].length; i++) {
-    triggers.push('lumberjack.info(\t\'\\\'' + caller + '\\\' -> \\\'' + emit_triggers[event][i] + '\\\'\');');
+    triggers.push('lumberjack.info(   \'\\\'' + caller + '\\\' -> \\\'' + emit_triggers[event][i] + '\\\'\');');
   }
   return triggers;
 }
