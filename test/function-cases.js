@@ -1,9 +1,7 @@
-const EventEmitter = require('event');
-const util = require('../src/util');
+const events = require('events');
+const util = require('util');
 
-const myEmitter = new EventEmitter();
-
-main();
+const myEmitter = new events.EventEmitter();
 
 //if(true) console.log('test');
 
@@ -88,6 +86,8 @@ function func15(){
   console.log('called func15');
 }
 
+main();
+
 function main(){
   // myEmitter.on('anonFuncEmit', () => {
   //   console.log('an event occurred!');
@@ -113,8 +113,8 @@ function main(){
   obj2.func8();
   counter1();
   counter2();
-  func9();
-  func10();
+  //func9();
+  //func10();
   emittingFunc();
 
 

@@ -3,7 +3,7 @@
 const fs = require('fs');
 const esprima = require('esprima');
 const walkAST = require('esprima-walk');
-const util = require('./util');
+const lumberjack_util = require('./util');
 
 var emits = [];
 var listeners = [];
@@ -268,7 +268,7 @@ function ast_walker(node) {
 
 // compares two LogItems by looking at their e_loc's, used to sort array of log inserts
 function compare_logs(log_a, log_b) {
-  return util.compare_loc(log_a.e_loc.start, log_b.e_loc.start);
+  return lumberjack_util.compare_loc(log_a.e_loc.start, log_b.e_loc.start);
 }
 
 function print_emits() {

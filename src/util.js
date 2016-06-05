@@ -21,7 +21,8 @@ module.exports = {
       return -1;
     } else if (a_line > b_line) {
       return 1;
-    } else { // lines are equal, comapre columns
+    } else { 
+      // lines are equal, compare columns
       var a_col = Number(loc_a.column);
       var b_col = Number(loc_b.column);
       if (a_col < b_col) {

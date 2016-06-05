@@ -4,13 +4,13 @@ Error.stackTraceLimit = Infinity;
 
 const inserter = require('./inserter');
 const ast_parser = require('./ast_parser');
-const util = require('./util');
+const lumberjack_util = require('./util');
 
 function main() {
   var target_filename = '../targets.txt';
 
   try {
-    var target_ret = util.process_targets(target_filename);
+    var target_ret = lumberjack_util.process_targets(target_filename);
     var targets = target_ret[0];
     var proj_name = target_ret[1];
 
@@ -21,7 +21,7 @@ function main() {
       log_collection = undefined;
       // read the file, format it to have braces (to insure BlockStatement wrapping, write it, load the formatted version
       try {
-        src = util.format_file(targets[i]);
+        src = lumberjack_util.format_file(targets[i]);
       } catch (err){
         console.error(err);
         continue;

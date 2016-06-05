@@ -1,8 +1,8 @@
 /*jshint esversion: 6 */
 
 const fs = require('fs');
-const readline = require('readline');
-const util = require('./util');
+const lumberjack_util = require('./util');
+const mkdirp = require('mkdirp');
 
 // array that represents the nessecary calls to bunyan to enable logging
 // Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
@@ -18,8 +18,8 @@ module.exports = {
   insert: function (filename, log_collection, proj_name) {
 
     var file_arr = fs.readFileSync(filename).toString().split('\n');
-    //var outfile = util.append_filename(filename, '_mod');
-     var outfile = filename;
+    //var outfile = lumberjack_util.append_filename(filename, '_mod');
+    var outfile = filename;
     var lumberjack_header_arr = gen_lumberjack_header(outfile, proj_name);
 
     // once we're done reading the file, insert the tuples and write
@@ -72,16 +72,38 @@ function insert_arr_in_file_arr(file_arr, insert_arr, line_num) {
 
 function gen_lumberjack_header(filepath, proj_name) {
   var header = [];
+  var logdir = 'lumberjack_logs/';
   var filename = filepath.substr(filepath.lastIndexOf('/')+1, filepath.length);
   var basepath =  filepath.substr(0, filepath.lastIndexOf(proj_name) + proj_name.length  + 1);
   var subpath = filepath.substr(filepath.lastIndexOf(proj_name) + proj_name.length  + 1, filepath.length);
-  var logpath = basepath + 'lumberjack_logs/' + subpath + '.log';
+  var logpath = basepath + logdir + subpath + '.log';
   
 
   // see const_lumberjack_header_arr for details/structure
   header[0] = const_lumberjack_header_arr[0];
   header[1] = const_lumberjack_header_arr[1] + filename + const_lumberjack_header_arr[2] + logpath + const_lumberjack_header_arr[3];
+
+  mk_lumberjack_dirs(basepath, logdir, subpath);
   return header;
+}
+
+// makes the neccessarily directories for lumberjack
+function mk_lumberjack_dirs(basepath, logdir, subpath){
+  // basepath should already exist
+  //console.log(basepath + logdir + subpath);
+  // create logging dir
+  var dir_end_idx = subpath.lastIndexOf('/');
+  var subdirs = ''
+  if (dir_end_idx != -1) {
+    subdirs = subpath.substr(0, dir_end_idx);
+  }
+  mkdirp(basepath + logdir + subdirs, function(err) {
+    if (err) {
+      console.error(err);
+    }
+  });
+  // create dirs for every dir in subpath
+
 }
 
 function gen_unblk_arrow_insert(log_item, e_str) {
@@ -125,7 +147,7 @@ function write_format_file_arr(file_arr, filename) {
   });
   //format the file after we write it
   file.on('finish', function () {
-    util.format_file(filename);
+    lumberjack_util.format_file(filename);
   });
 
   // write to file
