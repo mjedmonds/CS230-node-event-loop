@@ -49,8 +49,6 @@ function insert_log_collection(file_arr, log_collection)
 {
   var log_item;
   var insert_loc;
-  var whitespace_str;
-  var insert_str;
   var ori_line_idx;
   var e_str;
   var insert_arr = [];
