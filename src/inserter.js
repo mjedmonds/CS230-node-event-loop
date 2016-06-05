@@ -8,42 +8,25 @@ const util = require('./util');
 // Note: between positions 2 and 3 (name) and 4 and 5 (path), the filename should be inserted
 // this will be inserted after the last require() call in the source. If no require is found, insert at the beginning
 const const_lumberjack_header_arr = [
-  'const bunyan = require(\'bunyan\');',
+  'var bunyan = require(\'bunyan\');',
   'var lumberjack = bunyan.createLogger({ name: \'',
   '\', streams: [ {level: \'info\', path: \'',
   '\'}]});'
 ];
 
 module.exports = {
-  insert: function (filename, log_collection) {
-    var instream = fs.createReadStream(filename);
-    var outstream = new (require('stream'))(); // won't use this, just need to push lines into an array
-    var rl = readline.createInterface(instream, outstream);
-    var file_arr = [];
+  insert: function (filename, log_collection, proj_name) {
+
+    var file_arr = fs.readFileSync(filename).toString().split('\n');
     //var outfile = util.append_filename(filename, '_mod');
-    var outfile = filename;
-    var lumberjack_header_arr = gen_lumberjack_header(outfile);
+     var outfile = filename;
+    var lumberjack_header_arr = gen_lumberjack_header(outfile, proj_name);
 
-    instream.on('error', function(err) {
-      console.error(err)
-    });
-    
-    rl.on('error', function(err) {
-      console.error(err);
-    });
-
-    rl.on('line', function (line) {
-      file_arr.push(line); // 'line' contains the current line without the trailing newline character.
-    });
-    
     // once we're done reading the file, insert the tuples and write
-    rl.on('close', function () {
-      //console.log(file_arr);
-      file_arr = insert_log_collection(file_arr, log_collection);
-      //console.log(file_arr);
-      file_arr = insert_arr_in_file_arr(file_arr, lumberjack_header_arr, 0);
-      write_format_file_arr(file_arr, outfile);
-    });
+    file_arr = insert_log_collection(file_arr, log_collection);
+    //console.log(file_arr);
+    file_arr = insert_arr_in_file_arr(file_arr, lumberjack_header_arr, 0);
+    write_format_file_arr(file_arr, outfile);
   }
 };
 
@@ -87,14 +70,13 @@ function insert_arr_in_file_arr(file_arr, insert_arr, line_num) {
   return file_arr;
 }
 
-function gen_lumberjack_header(filename) {
+function gen_lumberjack_header(filepath, proj_name) {
   var header = [];
-  var logpath = '../log/';
-  if (filename.length > 2 && filename.substr(0, 3) == '../') {
-    logpath += filename.substr(3, filename.length) + '.log';
-  } else {
-    logpath += filename + '.log';
-  }
+  var filename = filepath.substr(filepath.lastIndexOf('/')+1, filepath.length);
+  var basepath =  filepath.substr(0, filepath.lastIndexOf(proj_name) + proj_name.length  + 1);
+  var subpath = filepath.substr(filepath.lastIndexOf(proj_name) + proj_name.length  + 1, filepath.length);
+  var logpath = basepath + 'lumberjack_logs/' + subpath + '.log';
+  
 
   // see const_lumberjack_header_arr for details/structure
   header[0] = const_lumberjack_header_arr[0];

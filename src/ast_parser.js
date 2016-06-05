@@ -60,7 +60,7 @@ function LogCollection(logs, triggers) {
 /* ---------------------------------------------------------------- */
 
 module.exports = {
-  collect_loggings: function (src, fname) {
+  collect_logs: function (src, fname) {
     // clear previous file's data
     emits = [];
     listeners = [];
@@ -74,8 +74,8 @@ module.exports = {
     walkAST.walkAddParent(ast, ast_walker);
 
     collect_emit_triggers();
-    var listener_logs = log_listeners();
-    var emit_logs = log_emits();
+    var listener_logs = gen_log_listeners();
+    var emit_logs = gen_log_emits();
     var logs = emit_logs.concat(listener_logs);
     logs.sort(compare_logs); // sort the logs by e_loc's
     //var log_collection = new LogCollection(logs, trigger_logs);
@@ -95,22 +95,25 @@ function find_emit_event_name(parent) {
 }
 
 // finds the function name of a calling function
-function find_function_name(parent) {
+function find_function_name(node) {
   try {
-    if (parent === null || parent === undefined) { // anonymous function case
+    if (node === null || node === undefined || node.type == 'CallExpression') {
+      // anonymous function case, either hit the root of the project,
+      // or the function is an anonymous function in a call expression (e.g. callback)
       // console.log("found function name: anon" + unknown_count);
       return null;
     }
-    else if (parent.type == 'Property' && parent.hasOwnProperty('key') && parent.key.hasOwnProperty('name')) { // handle special case of anonymous function that is a value in key/value pair
-      return parent.key.name;
+    else if (node.type == 'Property' && node.hasOwnProperty('key') && node.key.hasOwnProperty('name')) { 
+      // handle special case of anonymous function that is a value in key/value pair
+      return node.key.name;
     }
-    else if (!parent.id) { // otherwise if parent is null, recurse down parent looking for the function
-      // console.log("found null parent.id, parent.type: " + parent.type);
-      return find_function_name(parent.parent);
+    else if (!node.id) { // otherwise if node is null, recurse down node looking for the function
+      // console.log("found null node.id, node.type: " + node.type);
+      return find_function_name(node.parent);
     }
     else {
-      // console.log("found function name: " + parent.id.name)
-      return parent.id.name;
+      // console.log("found function name: " + node.id.name)
+      return node.id.name;
     }
   }
   catch (err){
@@ -121,17 +124,20 @@ function find_function_name(parent) {
 // finds the calling function of this AST node
 function find_emit_calling_function(node) {
   // global emit will not have a parent, "Program" is the parent in the AST
-  if (!node.hasOwnProperty('parent')) { // if the node doesn't have a parent, we are at the end of the AST
+  if (!node.hasOwnProperty('parent')) {
+    // if the node doesn't have a parent, we are at the end of the AST
     return 'Program';
   }
 
   var parent = node.parent;
 
-  if (parent.hasOwnProperty('type') && (parent.type == 'FunctionExpression' || parent.type == 'FunctionDeclaration' || parent.type == 'ArrowFunctionExpression')) { // if we find a function, look for its name
+  if (parent.hasOwnProperty('type') && (parent.type == 'FunctionExpression' || parent.type == 'FunctionDeclaration' || parent.type == 'ArrowFunctionExpression')) {
+    // if we find a function, look for its name
     //console.log("found function for emit");
     return find_function_name(parent);
   }
-  else { // otherwise recurse up the parent
+  else {
+    // otherwise recurse up the parent
     return find_emit_calling_function(parent);
   }
 }
@@ -141,13 +147,16 @@ function find_enclosing_blk_stmt(node) {
   if (node.hasOwnProperty('type') && node.type == 'BlockStatement') {
     return new BlkStmtLoc(node.loc, false, false);
   }
-  else if (node.type == 'Program') { // if we are at the root of the AST, don't recurse
+  else if (node.type == 'Program') {
+    // if we are at the root of the AST, don't recurse
     return new BlkStmtLoc(null, true, false);
   }
-  else if (node.type == 'ArrowFunctionExpression') { // special case where we hit an arrow function before a block statement 
+  else if (node.type == 'ArrowFunctionExpression') {
+    // special case where we hit an arrow function before a block statement
     return new BlkStmtLoc(null, false, true);
   }
-  else { // recurse down the parent
+  else {
+    // recurse down the parent
     return find_enclosing_blk_stmt(node.parent);
   }
 }
@@ -164,16 +173,30 @@ function find_call_expr_loc(node) {
 
 // collects emitting node information (event and caller) and registers them into the emits global var
 function collect_emits(node) {
-  if (node.type == 'Identifier' && node.hasOwnProperty('name') && node.name == 'emit') { // found an emit
-    var emit_event = find_emit_event_name(node.parent); // emit_ret[0] = event name, emit_ret[1] = loc of emit()
-    var calling_func = find_emit_calling_function(node.parent); // calling_func[0] = name of calling func, calling_func[1] = loc of calling function
+  if (determine_emit(node)) {
+    // found an emit
+    var emit_event = find_emit_event_name(node.parent);
+    var calling_func = find_emit_calling_function(node.parent);
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var emit_loc = find_call_expr_loc(node.parent);
 
+    if (calling_func === null || calling_func === undefined) {
+      calling_func = gen_anon_name(node);
+    }
+    
     emits.push(new Emit(emit_event, calling_func, emit_loc, blk_stmt_loc, filename));
     return true;
   }
   else { // didn't find an emit
+    return false;
+  }
+}
+
+function determine_emit(node){
+  if(node.type == 'Identifier' && node.hasOwnProperty('name') && node.name == 'emit'
+    && node.parent.type == 'MemberExpression' && node.parent.parent.type == 'CallExpression'){
+    return true;
+  } else{
     return false;
   }
 }
@@ -211,9 +234,11 @@ function collect_listeners(node) {
     var callback_func = find_callback_function(node.expression.arguments[1]);
     var blk_stmt_loc = find_enclosing_blk_stmt(node.parent);
     var calling_func_loc = node.loc; // already at the CallExpression/ExpressionStatement in the AST
-    if (callback_func === null) {
-      callback_func = 'anon_' + node.loc.start.line;
+
+    if (callback_func === null || callback_func === undefined) {
+      callback_func = gen_anon_name(node);
     }
+
     listeners.push(new Listener(event.value, callback_func, once, calling_func_loc, blk_stmt_loc, filename));
   }
 }
@@ -263,17 +288,26 @@ function print_listeners() {
   }
 }
 
-function log_emits() {
+function gen_log_emits() {
   var emit_logs = [];
+  var log_item;
   for (var i = 0; i < emits.length; i++) {
-    emit_logs.push(new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
-      'lumberjack.info(\'function \\\'' + emits[i].caller + '\\\' emitting event \\\'' + emits[i].event + '\\\'\');',
-      log_triggers(emits[i].event, emits[i].caller), emits[i].filename));
+    if(emits[i].event === null || emits[i].event === undefined){
+      log_item = new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
+        'lumberjack.info(\'function \\\'' + emits[i].caller + '\\\' emits dynamic event (set breakpoint to examine)\');',
+        gen_log_triggers(emits[i].event, emits[i].caller), emits[i].filename)
+    } else {
+      log_item = new LogItem(emits[i].emit_loc, emits[i].blk_stmt_loc,
+        'lumberjack.info(\'function \\\'' + emits[i].caller + '\\\' emitting event \\\'' + emits[i].event + '\\\'\');',
+        gen_log_triggers(emits[i].event, emits[i].caller), emits[i].filename)
+    }
+    emit_logs.push(log_item);
   }
   return emit_logs;
 }
 
-function log_listeners() {
+
+function gen_log_listeners() {
   var listener_logs = [];
   for (var i = 0; i < listeners.length; i++) {
     if (listeners[i].once) {
@@ -288,10 +322,14 @@ function log_listeners() {
   return listener_logs;
 }
 
-function log_triggers(event, caller) {
+function gen_log_triggers(event, caller) {
   var triggers = [];
   for (var i = 0; event in emit_triggers && i < emit_triggers[event].length; i++) {
-    triggers.push('lumberjack.info(   \'\\\'' + caller + '\\\' -> \\\'' + emit_triggers[event][i] + '\\\'\');');
+    triggers.push('lumberjack.info(\'\\\'' + caller + '\\\' -> \\\'' + emit_triggers[event][i] + '\\\'\');');
   }
   return triggers;
+}
+
+function gen_anon_name(node){
+  return 'anon_' + filename.substr(filename.lastIndexOf('/') + 1, filename.length) + '_'+  node.loc.start.line;
 }

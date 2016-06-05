@@ -1,5 +1,6 @@
 /*jshint esversion: 6 */
 
+Error.stackTraceLimit = Infinity;
 
 const inserter = require('./inserter');
 const ast_parser = require('./ast_parser');
@@ -8,22 +9,47 @@ const util = require('./util');
 function main() {
   var target_filename = '../targets.txt';
 
-  util.process_targets(target_filename);
+  try {
+    var target_ret = util.process_targets(target_filename);
+    var targets = target_ret[0];
+    var proj_name = target_ret[1];
 
-  // once the file_arr has been populated by fetch_target_files, process each file
-  util.file_emitter.on('filearrloaded', function(file_arr) {
     //console.log(file_arr);
-    for (var i = 0; i < file_arr.length; i++) {
+    var log_collection, src;
+    for (var i = 0; i < targets.length; i++) {
+      src = undefined;
+      log_collection = undefined;
       // read the file, format it to have braces (to insure BlockStatement wrapping, write it, load the formatted version
-      var src = util.format_file(file_arr[i]);
+      try {
+        src = util.format_file(targets[i]);
+      } catch (err){
+        console.error(err);
+        continue;
+      }
 
-      var log_collection = ast_parser.collect_loggings(src, file_arr[i]);
+      // parse AST of this file
+      try {
+        log_collection = ast_parser.collect_logs(src, targets[i]);
+      } catch (err) {
+        console.error('AST parsing error: \'' + err + '\' in ' + targets[i]);
+        continue;
+      }
 
-      if (log_collection.length !== 0) { // insert if we found anything worth logging
-        inserter.insert(file_arr[i], log_collection);
+      // insert the logs into the files
+      try{
+        if (log_collection !== undefined && log_collection.length !== 0) { // insert if we found anything worth logging
+          inserter.insert(targets[i], log_collection, proj_name);
+        }
+      } catch (err) {
+        console.error('lumberjack log insertion error: \'' + err + '\'');
       }
     }
-  });
+  } catch (err) {
+    // any other error, fail
+    console.error(err);
+    return -1;
+  }
+
 
 }
 
