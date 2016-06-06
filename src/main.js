@@ -36,7 +36,7 @@ function main() {
       }
 
       // insert the logs into the files
-      try{
+      try {
         if (log_collection !== undefined && log_collection.length !== 0) { // insert if we found anything worth logging
           inserter.insert(targets[i], log_collection, proj_name);
         }
@@ -49,8 +49,6 @@ function main() {
     console.error(err);
     return -1;
   }
-
-
 }
 
 main();
