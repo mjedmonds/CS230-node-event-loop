@@ -76,7 +76,7 @@ module.exports = {
           console.error(err);
         }
       });
-      fs_extra.copySync(line, proj_dup_path, {dereference: true}, function (err) {
+      fs_extra.copySync(line, proj_dup_path, {clobber: true, dereference: true}, function (err) {
         if (err) {
           console.error(err);
         }

@@ -213,7 +213,7 @@ function find_callback_function(callback) {
 
 // finds all on() and once() calls and registers them into the listeners var
 function collect_listeners(node) {
-  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression" && node.expression.arguments.length == 2
+  if (node.type == "ExpressionStatement" && node.expression.type == "CallExpression"
     && node.expression.callee.hasOwnProperty('property') && node.expression.callee.property.hasOwnProperty('name')) {
     var once;
     try {
